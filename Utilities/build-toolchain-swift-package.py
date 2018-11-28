@@ -15,6 +15,7 @@ import errno
 import os
 import platform
 import shutil
+import sys
 
 LIB_SUFFIX = 'dylib' if platform.system() == 'Darwin' else 'so'
 
@@ -65,31 +66,40 @@ def main():
   build_path = os.path.abspath(args.build_path)
   toolchain_root = os.path.join(build_path, 'fake_toolchain')
 
-  makedirs_force(toolchain_root)
-
   make_fake_toolchain(toolchain_root, args)
 
   # build, test
 
 def make_fake_toolchain(root, args):
-  shutil.rmtree(root)
+  if os.path.exists(root):
+    shutil.rmtree(root)
 
   bin_path = os.path.join(root, 'usr', 'bin')
   lib_path = os.path.join(root, 'usr', 'lib')
   lib_swift_path = os.path.join(lib_path, 'swift')
+  if platform.system() == 'Darwin':
+    lib_swift_host_path = os.path.join(lib_swift_path, 'macosx')
+  elif platform.system() == 'Linux':
+    lib_swift_host_path = os.path.join(lib_swift_path, 'linux')
+  else:
+    print('Unknown host platform')
+    sys.exit(1)
+  # FIXME: hardcoded arch
+  module_path = os.path.join(lib_swift_path, 'x86_64')
+
   makedirs_force(bin_path)
-  makedirs_force(lib_swift_path)
+  makedirs_force(module_path)
 
   def maybe_copy_or_symlink(target, link_name):
     if target and os.path.exists(target):
       copy_or_symlink(target, link_name)
-    else:
+    elif target:
       print('Skip {}'.format(target))
 
   if args.swiftc_path:
-    # Needs to be a hard link, because the resource directory is resolved
+    # swift cannot be a symlink, because the resource directory is resolved
     # relative to the binary's real path.
-    copy_or_hardlink(args.swiftc_path, os.path.join(bin_path, 'swift'))
+    clonefile(args.swiftc_path, os.path.join(bin_path, 'swift'))
     symlink_force('swift', os.path.join(bin_path, 'swiftc'))
     target_bin = os.path.dirname(args.swiftc_path)
     target_lib = os.path.normpath(os.path.join(target_bin, '..',  'lib'))
@@ -100,6 +110,30 @@ def make_fake_toolchain(root, args):
 
   maybe_copy_or_symlink(args.swift_build_path, os.path.join(bin_path, 'swift-build'))
   maybe_copy_or_symlink(args.swift_test_path, os.path.join(bin_path, 'swift-test'))
+
+
+  if args.libdispatch_source_dir:
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_source_dir, 'dispatch'), lib_swift_path)
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_source_dir, 'os'), lib_swift_path)
+
+  if args.libdispatch_build_dir:
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_build_dir, 'libBlocksRuntime.{}'.format(LIB_SUFFIX)), lib_swift_host_path)
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_build_dir, 'src', 'libdispatch.{}'.format(LIB_SUFFIX)), lib_swift_host_path)
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_build_dir, 'src', 'libswiftDispatch.{}'.format(LIB_SUFFIX)), lib_swift_host_path)
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_build_dir, 'src', 'swift', 'Dispatch.swiftmodule'), module_path)
+    maybe_copy_or_symlink(os.path.join(args.libdispatch_build_dir, 'src', 'swift', 'Dispatch.swiftdoc'), module_path)
+
+  if args.foundation_path:
+    maybe_copy_or_symlink(os.path.join(args.foundation_path, 'libFoundation.{}'.format(LIB_SUFFIX)), lib_swift_host_path)
+    maybe_copy_or_symlink(os.path.join(args.foundation_path, 'swift', 'Foundation.swiftmodule'), module_path)
+    maybe_copy_or_symlink(os.path.join(args.foundation_path, 'swift', 'Foundation.swiftdoc'), module_path)
+    maybe_copy_or_symlink(os.path.join(args.foundation_path, 'CoreFoundation-prefix', 'System', 'Library', 'Frameworks', 'CoreFoundation.framework'), module_path)
+
+  if args.xctest_path:
+    maybe_copy_or_symlink(os.path.join(args.xctest_path, 'libXCTest.{}'.format(LIB_SUFFIX)), lib_swift_host_path)
+    maybe_copy_or_symlink(os.path.join(args.xctest_path, 'swift', 'XCTest.swiftmodule'), module_path)
+    maybe_copy_or_symlink(os.path.join(args.xctest_path, 'swift', 'XCTest.swiftdoc'), module_path)
+
 
 def copy_or_symlink_recursive(target_dir, link_dir):
   for root, dirs, files in os.walk(target_dir):
@@ -115,15 +149,13 @@ def copy_or_symlink_recursive(target_dir, link_dir):
 def copy_or_symlink(target, link_name):
   symlink_force(target, link_name)
 
-def copy_or_hardlink(target, link_name):
-  link_force(target, link_name)
-
 def symlink_force(target, link_name):
+  if os.path.isdir(link_name):
+    link_name = os.path.join(link_name, os.path.basename(target))
+
   if verbose:
     print('Symlink {} -> {}'.format(link_name, target))
 
-  if os.path.isdir(link_name):
-    link_name = os.path.join(link_name, os.path.basename(target))
   try:
     os.symlink(target, link_name)
   except OSError as e:
@@ -133,20 +165,11 @@ def symlink_force(target, link_name):
     else:
       raise e
 
-def link_force(target, link_name):
+def clonefile(source, dest):
   if verbose:
-    print('Hardlink {} -> {}'.format(link_name, target))
+    print('Copy {} to {}'.format(source, dest))
 
-  if os.path.isdir(link_name):
-    link_name = os.path.join(link_name, os.path.basename(target))
-  try:
-    os.link(target, link_name)
-  except OSError as e:
-    if e.errno == errno.EEXIST:
-      os.remove(link_name)
-      os.link(target, link_name)
-    else:
-      raise e
+  shutil.copy2(source, dest)
 
 def makedirs_force(path):
   try:
