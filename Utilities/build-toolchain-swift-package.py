@@ -84,7 +84,15 @@ def main():
     swiftpm_cmd(swift, 'build', args, toolchain_root)
 
 def swiftpm_cmd(swift, verb, args, toolchain_root):
-  cmd = [swift, verb]
+  cmd = [
+    swift, verb,
+    '--build-path', args.build_path,
+    '--package-path', args.package_path,
+    '--configuration', args.configuration,
+  ]
+
+  if args.verbose:
+    cmd += ['-v']
 
   if platform.system() != 'Darwin':
     cmd += ['-Xcxx', '-I', '-Xcxx', os.path.join(toolchain_root, 'usr', 'lib', 'swift')]
