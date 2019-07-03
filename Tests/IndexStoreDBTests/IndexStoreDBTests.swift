@@ -29,8 +29,20 @@ func isSourceFileExtension(_ ext: String) -> Bool {
   }
 }
 
-struct LocationScanner {
+final class SourceFileCache {
+  var cache: [URL: String] = [:]
 
+  func get(_ file: URL) throws -> String {
+    if let content = cache[file] {
+      return content
+    }
+    let content = try String(contentsOfFile: file.path, encoding: .utf8)
+    cache[file] = content
+    return content
+  }
+}
+
+struct LocationScanner {
   var result: [String: TestLoc] = [:]
 
   enum Error: Swift.Error {
@@ -53,8 +65,6 @@ struct LocationScanner {
 
     while i != str.endIndex {
       let c = str[i]
-
-      let x = 1/**/*/**/2
 
       switch (last, c) {
       case ("/", "*"):
@@ -101,12 +111,12 @@ struct LocationScanner {
     }
   }
 
-  mutating func scan(file: URL) throws {
-    let content = try String(contentsOfFile: file.path, encoding: .utf8)
+  mutating func scan(file: URL, sourceCache: SourceFileCache) throws {
+    let content = try sourceCache.get(file)
     try scan(content, url: file)
   }
 
-  mutating func scan(rootDirectory: URL) throws {
+  mutating func scan(rootDirectory: URL, sourceCache: SourceFileCache) throws {
     let fm = FileManager.default
 
     guard let generator = fm.enumerator(at: rootDirectory, includingPropertiesForKeys: []) else {
@@ -115,25 +125,26 @@ struct LocationScanner {
 
     while let url = generator.nextObject() as? URL {
       if isSourceFileExtension(url.pathExtension) {
-        try scan(file: url)
+        try scan(file: url, sourceCache: sourceCache)
       }
     }
   }
 }
 
-func scanLocations(rootDirectory: URL) throws -> [String: TestLoc] {
+func scanLocations(rootDirectory: URL, sourceCache: SourceFileCache) throws -> [String: TestLoc] {
   var scanner = LocationScanner()
-  try scanner.scan(rootDirectory: rootDirectory)
+  try scanner.scan(rootDirectory: rootDirectory, sourceCache: sourceCache)
   return scanner.result
 }
 
 final class TestProject {
   var sourceRoot: URL
+  let sourceCache: SourceFileCache = SourceFileCache()
   var locations: [String: TestLoc]
 
   init(sourceRoot: URL) throws {
     self.sourceRoot = sourceRoot
-    self.locations = try scanLocations(rootDirectory: sourceRoot)
+    self.locations = try scanLocations(rootDirectory: sourceRoot, sourceCache: sourceCache)
   }
 }
 
@@ -171,7 +182,8 @@ final class LocationScannerTests: XCTestCase {
   }
 
   func scanDir(_ dir: URL) throws -> [Loc] {
-    return try scanLocations(rootDirectory: dir).map { key, value in Loc(key, value) }.sorted()
+    return try scanLocations(rootDirectory: dir, sourceCache: SourceFileCache())
+      .map { key, value in Loc(key, value) }.sorted()
   }
 
   func testSmall() throws {
