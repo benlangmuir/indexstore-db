@@ -114,11 +114,8 @@ struct LocationScanner {
 
     enum State {
       /// Outside any comment.
-      case normal
-      /// Outside any comment, immediate after a '/'.
-      ///     /X
-      ///      ^
-      case openSlash
+      case normal(prev: Character)
+
       /// Inside a comment. The payload contains the previous character and the index of the first
       /// character after the '*' (i.e. the start of the comment body).
       ///
@@ -129,7 +126,7 @@ struct LocationScanner {
       case comment(bodyStart: String.Index, prev: Character)
     }
 
-    var state = State.normal
+    var state = State.normal(prev: "_")
     var i = str.startIndex
     var line = 1
     var column = 1
@@ -138,17 +135,10 @@ struct LocationScanner {
       let c = str[i]
 
       switch (state, c) {
-      case (.normal, "/"):
-        state = .openSlash
-      case (.normal, _):
-        break
-
-      case (.openSlash, "*"):
+      case (.normal("/"), "*"):
         state = .comment(bodyStart: str.index(after: i), prev: "_")
-      case (.openSlash, "/"):
-        break
-      case (.openSlash, _):
-        state = .normal
+      case (.normal(_), _):
+        state = .normal(prev: c)
 
       case (.comment(let start, "*"), "/"):
         let name = String(str[start..<str.index(before: i)])
@@ -156,7 +146,7 @@ struct LocationScanner {
         if let prevLoc = result.updateValue(loc, forKey: name) {
           throw Error.duplicateKey(name, prevLoc, loc)
         }
-        state = .normal
+        state = .normal(prev: "_")
 
       case (.comment(_, "/"), "*"):
         throw Error.nestedComment(TestLoc(url: url, line: line, column: column))
