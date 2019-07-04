@@ -29,6 +29,62 @@ func isSourceFileExtension(_ ext: String) -> Bool {
   }
 }
 
+
+/// ```
+/// {
+///   "targets": [
+///     {
+///       "sources": ["a.swift", "b.swift"]
+///     }
+///   ]
+/// }
+/// ```
+struct TibsManifest {
+
+  struct Target: Codable {
+    var name: String? = nil
+    var compiler_arguments: [String]? = nil
+    var sources: [String]
+    // TODO: dependencies
+  }
+
+  var targets: [Target]
+}
+
+struct TibsResolvedTarget {
+  var name: String
+  var extraArgs: [String]
+  var sources: [URL]
+  var outputNameForUnit: String
+
+  // TODO: dependencies, outputs, import paths, ...
+}
+
+final class TibsBuilder {
+
+  var targets: [String: TibsResolvedTarget] = [:]
+
+  enum Error: Swift.Error {
+    case duplicateTarget(String)
+  }
+
+  init(manifest: TibsManifest, sourceRoot: URL, buildRoot: URL) throws {
+    for targetDesc in manifest.targets {
+      let name = targetDesc.name ?? "main"
+
+      let target = TibsResolvedTarget(
+        name: name,
+        extraArgs: targetDesc.compiler_arguments ?? [],
+        sources: targetDesc.sources.map { URL(fileURLWithPath: $0) },
+        outputNameForUnit: "")
+
+      if targets.updateValue(target, forKey: name) != nil {
+        throw Error.duplicateTarget(name)
+      }
+    }
+  }
+}
+
 final class SourceFileCache {
   var cache: [URL: String] = [:]
 
