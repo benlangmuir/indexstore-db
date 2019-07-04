@@ -112,57 +112,66 @@ struct LocationScanner {
       return
     }
 
-    var last: Character = "X"
+    enum State {
+      /// Outside any comment.
+      case normal
+      /// Outside any comment, immediate after a '/'.
+      ///     /X
+      ///      ^
+      case openSlash
+      /// Inside a comment. The payload contains the previous character and the index of the first
+      /// character after the '*' (i.e. the start of the comment body).
+      ///
+      ///       bodyStart
+      ///       |
+      ///     /*XXX*/
+      ///       ^^^
+      case comment(bodyStart: String.Index, prev: Character)
+    }
+
+    var state = State.normal
     var i = str.startIndex
-    var bodyStart: String.Index? = nil
-    var commentNestingLevel = 0
     var line = 1
     var column = 1
 
     while i != str.endIndex {
       let c = str[i]
 
-      switch (last, c) {
-      case ("/", "*"):
-        if commentNestingLevel > 0 {
-          throw Error.nestedComment(TestLoc(url: url, line: line, column: column))
-        }
-        bodyStart = str.index(after: i)
-        commentNestingLevel += 1
-        column += 1
-        i = str.index(after: i)
-        last = "X" // /*/ is not a full comment
-        continue
-        
-      case ("*", "/"):
-        if commentNestingLevel == 1 {
-          let name = String(str[bodyStart!..<str.index(before: i)])
-          let loc =  TestLoc(url: url, line: line, column: column + 1)
-          if let prevLoc = result[name] {
-            throw Error.duplicateKey(name, prevLoc, loc)
-          }
-          result[name] = loc
-          bodyStart = nil
-        }
-        last = c
-        column += 1
-        i = str.index(after: i)
-        if commentNestingLevel > 0 {
-          commentNestingLevel -= 1
-          last = "X" // /**/* is only one comment
-        }
-        continue
-
-      case (_, "\n"):
-        line += 1
-        column = 0
-
-      default:
+      switch (state, c) {
+      case (.normal, "/"):
+        state = .openSlash
+      case (.normal, _):
         break
+
+      case (.openSlash, "*"):
+        state = .comment(bodyStart: str.index(after: i), prev: "_")
+      case (.openSlash, "/"):
+        break
+      case (.openSlash, _):
+        state = .normal
+
+      case (.comment(let start, "*"), "/"):
+        let name = String(str[start..<str.index(before: i)])
+        let loc =  TestLoc(url: url, line: line, column: column + 1)
+        if let prevLoc = result.updateValue(loc, forKey: name) {
+          throw Error.duplicateKey(name, prevLoc, loc)
+        }
+        state = .normal
+
+      case (.comment(_, "/"), "*"):
+        throw Error.nestedComment(TestLoc(url: url, line: line, column: column))
+
+      case (.comment(let start, _), _):
+        state = .comment(bodyStart: start, prev: c)
       }
 
-      last = c
-      column += 1
+      if c == "\n" {
+        line += 1
+        column = 1
+      } else {
+        column += 1
+      }
+
       i = str.index(after: i)
     }
   }
