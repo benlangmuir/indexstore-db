@@ -11,6 +11,9 @@ let package = Package(
     .library(
       name: "IndexStoreDB_CXX",
       targets: ["IndexStoreDB_Index"]),
+    .executable(
+      name: "tibs",
+      targets: ["tibs"])
   ],
   dependencies: [],
   targets: [
@@ -21,9 +24,17 @@ let package = Package(
       name: "IndexStoreDB",
       dependencies: ["IndexStoreDB_CIndexStoreDB"]),
 
+    .target(
+      name: "ISDBTestSupport",
+      dependencies: []),
+
+    .target(
+      name: "tibs",
+      dependencies: ["ISDBTestSupport"]),
+
     .testTarget(
       name: "IndexStoreDBTests",
-      dependencies: ["IndexStoreDB"]),
+      dependencies: ["IndexStoreDB", "ISDBTestSupport"]),
 
     // MARK: C++ interface
 
