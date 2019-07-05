@@ -55,7 +55,7 @@ public struct TibsManifest {
     public var name: String? = nil
     public var compilerArguments: [String]? = nil
     public var sources: [String]
-    // TODO: dependencies
+    public var dependencies: [String]? = nil
   }
 
   public var targets: [Target]
@@ -91,8 +91,7 @@ public struct TibsResolvedTarget {
   public var emitModulePath: String { "\(name).swiftmodule" }
   public var outputFileMap: OutputFileMap
   public var outputFileMapPath: String { "\(name)-output-file-map.json" }
-
-  // TODO: dependencies, outputs, import paths, ...
+  public var dependencies: [String]
 }
 
 public struct TibsToolchain {
@@ -138,6 +137,7 @@ public final class TibsBuilder {
 
   public enum Error: Swift.Error {
     case duplicateTarget(String)
+    case unknownDependency(String, declaredIn: String)
   }
 
   public init(manifest: TibsManifest, sourceRoot: URL, buildRoot: URL, toolchain: TibsToolchain) throws {
@@ -163,10 +163,19 @@ public final class TibsBuilder {
         name: name,
         extraArgs: targetDesc.compilerArguments ?? [],
         sources: sources,
-        outputFileMap: outputFileMap)
+        outputFileMap: outputFileMap,
+        dependencies: targetDesc.dependencies ?? [])
 
       if targets.updateValue(target, forKey: name) != nil {
         throw Error.duplicateTarget(name)
+      }
+    }
+
+    for target in targets.values {
+      for dep in target.dependencies {
+        if targets[dep] == nil {
+          throw Error.unknownDependency(dep, declaredIn: target.name)
+        }
       }
     }
   }
@@ -208,7 +217,7 @@ public final class TibsBuilder {
     stream.write("""
       rule swiftc_index
         description = Indexing Swift Module $MODULE_NAME
-        command = \(toolchain.swiftc.path) -module-name $MODULE_NAME $in -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $EXTRA_ARGS
+        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $EXTRA_ARGS
         restat = 1 # Swift doesn't rewrite modules that haven't changed
       """)
   }
@@ -218,15 +227,17 @@ public final class TibsBuilder {
     // FIXME: some of these are deleted by the compiler!?
     // outputs += target.outputFileMap.allOutputs
 
+    let swiftDeps = target.dependencies.map { dep in targets[dep]!.emitModulePath }
+
     // TODO:
     // * dependency on compiler
-    // * dependencies
     stream.write("""
       build \(outputs.joined(separator: " ")): \
       swiftc_index \(target.sources.map{ $0.path }.joined(separator: " ")) \
-      | \(target.outputFileMapPath)
+      | \(swiftDeps.joined(separator: " ")) \(target.outputFileMapPath)
         MODULE_NAME = \(target.name)
         MODULE_PATH = \(target.emitModulePath)
+        IMPORT_PATHS = \(target.dependencies.isEmpty ? "" : "-I .")
         EXTRA_ARGS = \(target.extraArgs.joined(separator: " "))
         OUTPUT_FILE_MAP = \(target.outputFileMapPath)
       """)
