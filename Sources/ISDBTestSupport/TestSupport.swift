@@ -92,6 +92,7 @@ public struct TibsResolvedTarget {
   public var outputFileMap: OutputFileMap
   public var outputFileMapPath: String { "\(name)-output-file-map.json" }
   public var dependencies: [String]
+  public var importPaths: [String] { dependencies.isEmpty ? [] : ["."] }
 }
 
 public struct TibsToolchain {
@@ -126,6 +127,74 @@ extension OutputFileMap: Codable {
   }
   public func encode(to encoder: Encoder) throws {
     try value.encode(to: encoder)
+  }
+}
+
+/// The JSON clang-compatible compilation database.
+///
+/// * Note: this only supports the "arguments" form, not "command".
+///
+/// Example:
+///
+/// ```
+/// [
+///   {
+///     "directory": "/src",
+///     "file": "/src/file.cpp",
+///     "arguments": ["clang++", "file.cpp"]
+///   }
+/// ]
+/// ```
+///
+/// See https://clang.llvm.org/docs/JSONCompilationDatabase.html
+public struct JSONCompilationDatabase: Equatable {
+
+  /// A single compilation database command.
+  ///
+  /// See https://clang.llvm.org/docs/JSONCompilationDatabase.html
+  public struct Command: Equatable, Codable {
+
+    /// The working directory for the compilation.
+    public var directory: String
+
+    /// The path of the main file for the compilation, which may be relative to `directory`.
+    public var file: String
+
+    /// The compile command as a list of strings, with the program name first.
+    public var arguments: [String]
+
+    /// The name of the build output, or nil.
+    public var output: String? = nil
+  }
+
+  var commands: [Command] = []
+
+  init(commands: [Command] = []) {
+    self.commands = commands
+  }
+}
+
+extension JSONCompilationDatabase.Command {
+
+  /// The `URL` for this file. If `filename` is relative and `directory` is
+  /// absolute, returns the concatenation. However, if both paths are relative,
+  /// it falls back to `filename`, which is more likely to be the identifier
+  /// that a caller will be looking for.
+  public var url: URL {
+    if file.hasPrefix("/") || !directory.hasPrefix("/") {
+      return URL(fileURLWithPath: file)
+    } else {
+      return URL(fileURLWithPath: directory).appendingPathComponent(file, isDirectory: false)
+    }
+  }
+}
+
+extension JSONCompilationDatabase: Codable {
+  public init(from decoder: Decoder) throws {
+    self.commands = try [Command](from: decoder)
+  }
+  public func encode(to encoder: Encoder) throws {
+    try self.commands.encode(to: encoder)
   }
 }
 
@@ -180,10 +249,40 @@ public final class TibsBuilder {
     }
   }
 
+  public var compilationDatabase: JSONCompilationDatabase {
+    var commands = [JSONCompilationDatabase.Command]()
+    targets.values
+      .sorted(by: { a, b in a.emitModulePath < b.emitModulePath })
+      .forEach { target in
+        var args = [toolchain.swiftc.path]
+        args += target.sources.map { $0.path }
+        args += target.importPaths.flatMap { ["-I", $0] }
+        args += [
+          "-module-name", target.name,
+          "-index-store-path", "index",
+          "-index-ignore-system-modules",
+          "-output-file-map", target.outputFileMapPath,
+          "-emit-module",
+          "-emit-module-path", target.emitModulePath,
+        ]
+        args += target.extraArgs
+
+        target.sources.forEach { sourceFile in
+          commands.append(JSONCompilationDatabase.Command(
+            directory: buildRoot.path,
+            file: sourceFile.path,
+            arguments: args))
+        }
+      }
+    return JSONCompilationDatabase(commands: commands)
+  }
+
   public func writeBuildFiles() throws {
     try ninja.write(to: buildRoot.appendingPathComponent("build.ninja"), atomically: false, encoding: .utf8)
+    let encoder = JSONEncoder()
+    let compdb = try encoder.encode(compilationDatabase)
+    try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
     for target in targets.values {
-      let encoder = JSONEncoder()
       let ofm = try encoder.encode(target.outputFileMap)
       try ofm.write(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
     }
@@ -237,14 +336,12 @@ public final class TibsBuilder {
       | \(swiftDeps.joined(separator: " ")) \(target.outputFileMapPath)
         MODULE_NAME = \(target.name)
         MODULE_PATH = \(target.emitModulePath)
-        IMPORT_PATHS = \(target.dependencies.isEmpty ? "" : "-I .")
+        IMPORT_PATHS = \(target.importPaths.map { "-I \($0)" }.joined(separator: " "))
         EXTRA_ARGS = \(target.extraArgs.joined(separator: " "))
         OUTPUT_FILE_MAP = \(target.outputFileMapPath)
       """)
   }
 }
-
-
 
 public final class SourceFileCache {
   var cache: [URL: String] = [:]
