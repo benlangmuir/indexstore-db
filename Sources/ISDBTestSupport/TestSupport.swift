@@ -200,9 +200,10 @@ extension JSONCompilationDatabase: Codable {
 
 public final class TibsBuilder {
 
-  public var targets: [String: TibsResolvedTarget] = [:]
-  public var toolchain: TibsToolchain
-  public var buildRoot: URL
+  public private(set) var targets: [TibsResolvedTarget] = []
+  public private(set) var targetsByName: [String: TibsResolvedTarget] = [:]
+  public private(set) var toolchain: TibsToolchain
+  public private(set) var buildRoot: URL
 
   public enum Error: Swift.Error {
     case duplicateTarget(String)
@@ -235,14 +236,15 @@ public final class TibsBuilder {
         outputFileMap: outputFileMap,
         dependencies: targetDesc.dependencies ?? [])
 
-      if targets.updateValue(target, forKey: name) != nil {
+      targets.append(target)
+      if targetsByName.updateValue(target, forKey: name) != nil {
         throw Error.duplicateTarget(name)
       }
     }
 
-    for target in targets.values {
+    for target in targets {
       for dep in target.dependencies {
-        if targets[dep] == nil {
+        if targetsByName[dep] == nil {
           throw Error.unknownDependency(dep, declaredIn: target.name)
         }
       }
@@ -251,7 +253,7 @@ public final class TibsBuilder {
 
   public var compilationDatabase: JSONCompilationDatabase {
     var commands = [JSONCompilationDatabase.Command]()
-    targets.values
+    targets
       .sorted(by: { a, b in a.emitModulePath < b.emitModulePath })
       .forEach { target in
         var args = [toolchain.swiftc.path]
@@ -282,7 +284,7 @@ public final class TibsBuilder {
     let encoder = JSONEncoder()
     let compdb = try encoder.encode(compilationDatabase)
     try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
-    for target in targets.values {
+    for target in targets {
       let ofm = try encoder.encode(target.outputFileMap)
       try ofm.write(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
     }
@@ -299,7 +301,7 @@ public final class TibsBuilder {
     stream.write("\n\n")
     writeNinjaRules(to: &stream)
     stream.write("\n\n")
-    for target in targets.values {
+    for target in targets {
       writeNinjaSnippet(for: target, to: &stream)
       stream.write("\n\n")
     }
@@ -326,7 +328,7 @@ public final class TibsBuilder {
     // FIXME: some of these are deleted by the compiler!?
     // outputs += target.outputFileMap.allOutputs
 
-    let swiftDeps = target.dependencies.map { dep in targets[dep]!.emitModulePath }
+    let swiftDeps = target.dependencies.map { dep in targetsByName[dep]!.emitModulePath }
 
     // TODO:
     // * dependency on compiler
