@@ -207,6 +207,8 @@ public final class TibsBuilder {
   public private(set) var toolchain: TibsToolchain
   public private(set) var buildRoot: URL
 
+  public var indexstore: URL { buildRoot.appendingPathComponent("index") }
+
   public enum Error: Swift.Error {
     case duplicateTarget(String)
     case unknownDependency(String, declaredIn: String)
@@ -265,7 +267,7 @@ public final class TibsBuilder {
         args += target.importPaths.flatMap { ["-I", $0] }
         args += [
           "-module-name", target.name,
-          "-index-store-path", "index",
+          "-index-store-path", indexstore.path,
           "-index-ignore-system-modules",
           "-output-file-map", target.outputFileMapPath,
           "-emit-module",
@@ -285,12 +287,17 @@ public final class TibsBuilder {
 
   public func writeBuildFiles() throws {
     try ninja.write(to: buildRoot.appendingPathComponent("build.ninja"), atomically: false, encoding: .utf8)
+
     let encoder = JSONEncoder()
+    if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+      encoder.outputFormatting = .sortedKeys // stable output
+    }
+
     let compdb = try encoder.encode(compilationDatabase)
     try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
     for target in targets {
       let ofm = try encoder.encode(target.outputFileMap)
-      try ofm.write(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
+      try ofm.writeIfChanged(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
     }
   }
 
@@ -347,18 +354,25 @@ public final class TibsBuilder {
 
     let swiftDeps = target.dependencies.map { dep in targetsByName[dep]!.emitModulePath }
 
-    // TODO:
-    // * dependency on compiler
     stream.write("""
       build \(outputs.joined(separator: " ")): \
       swiftc_index \(target.sources.map{ $0.path }.joined(separator: " ")) \
-      | \(swiftDeps.joined(separator: " ")) \(target.outputFileMapPath)
+      | \(swiftDeps.joined(separator: " ")) \(target.outputFileMapPath) \(toolchain.swiftc.path)
         MODULE_NAME = \(target.name)
         MODULE_PATH = \(target.emitModulePath)
         IMPORT_PATHS = \(target.importPaths.map { "-I \($0)" }.joined(separator: " "))
         EXTRA_ARGS = \(target.extraArgs.joined(separator: " "))
         OUTPUT_FILE_MAP = \(target.outputFileMapPath)
       """)
+  }
+}
+
+extension Data {
+  func writeIfChanged(to url: URL, options: Data.WritingOptions = []) throws {
+    let prev = try Data(contentsOf: url)
+    if prev != self {
+      try write(to: url, options: options)
+    }
   }
 }
 

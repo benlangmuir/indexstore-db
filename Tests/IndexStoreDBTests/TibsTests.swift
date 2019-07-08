@@ -10,13 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+import IndexStoreDB
 import ISDBTestSupport
 import XCTest
 
 final class TibsTests: XCTestCase {
 
   func testBasic() throws {
-    let buildDir = productsDirectory.appendingPathComponent(testDirectoryName)
+    let buildDir = productsDirectory
+      .appendingPathComponent("isdb-tests")
+      .appendingPathComponent(testDirectoryName)
     let fm = FileManager.default
     try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
 
@@ -25,12 +28,42 @@ final class TibsTests: XCTestCase {
       ninja: findTool(name: "ninja"))
 
     let projectDir = inputsDirectory.appendingPathComponent("proj1")
+
+    let project = try TestProject(sourceRoot: projectDir)
+
     let manifestURL = projectDir.appendingPathComponent("project.json")
     let manifest = try JSONDecoder().decode(TibsManifest.self, from: try Data(contentsOf: manifestURL))
     let builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: buildDir, toolchain: tc)
 
     try builder.writeBuildFiles()
+
     try builder.build()
+
+    // -------
+
+    let libIndexStore = try IndexStoreLibrary(dylibPath: tc.swiftc
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("lib")
+      .appendingPathComponent("libIndexStore.dylib")
+      .path) // FIXME: non-Mac
+
+    let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("idsb-test-data")
+      .appendingPathComponent(testDirectoryName)
+
+    defer { _ = try? fm.removeItem(atPath: tmpDir.path) }
+
+    let index = try IndexStoreDB(
+      storePath: builder.indexstore.path,
+      databasePath: tmpDir.path,
+      library: libIndexStore)
+
+    // FIXME: wait for index to load!
+    usleep(100_000)
+
+    let occs = index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition])
+    XCTAssertEqual(2, occs.count)
   }
 
   /// The path the the test INPUTS directory.
@@ -61,7 +94,7 @@ final class TibsTests: XCTestCase {
 
     let className = name.dropFirst(2).prefix(while: { $0 != " " })
     let methodName = name[className.endIndex...].dropFirst().prefix(while: { $0 != "]"})
-    return "isdb_test.\(className).\(methodName)"
+    return "\(className).\(methodName)"
   }
 }
 
