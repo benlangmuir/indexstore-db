@@ -97,9 +97,11 @@ public struct TibsResolvedTarget {
 
 public struct TibsToolchain {
   public var swiftc: URL
+  public var ninja: URL? = nil
 
-  public init(swiftc: URL) {
+  public init(swiftc: URL, ninja: URL? = nil) {
     self.swiftc = swiftc
+    self.ninja = ninja
   }
 }
 
@@ -208,6 +210,8 @@ public final class TibsBuilder {
   public enum Error: Swift.Error {
     case duplicateTarget(String)
     case unknownDependency(String, declaredIn: String)
+    case buildFailure(Process.TerminationReason, exitCode: Int32)
+    case noNinjaBinaryConfigured
   }
 
   public init(manifest: TibsManifest, sourceRoot: URL, buildRoot: URL, toolchain: TibsToolchain) throws {
@@ -287,6 +291,19 @@ public final class TibsBuilder {
     for target in targets {
       let ofm = try encoder.encode(target.outputFileMap)
       try ofm.write(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
+    }
+  }
+
+  public func build() throws {
+
+    guard let ninja = toolchain.ninja?.path else {
+      throw Error.noNinjaBinaryConfigured
+    }
+
+    let p = Process.launchedProcess(launchPath: ninja, arguments: ["-C", buildRoot.path])
+    p.waitUntilExit()
+    if p.terminationReason != .exit || p.terminationStatus != 0 {
+      throw Error.buildFailure(p.terminationReason, exitCode: p.terminationStatus)
     }
   }
 
