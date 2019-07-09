@@ -72,8 +72,8 @@ public:
 indexstoredb_index_t
 indexstoredb_index_create(const char *storePath, const char *databasePath,
                           indexstore_library_provider_t libProvider,
-                          // delegate,
-                          bool readonly, indexstoredb_error_t *error) {
+                          bool readonly, bool listenToUnitEvents,
+                          indexstoredb_error_t *error) {
 
   auto delegate = std::make_shared<IndexSystemDelegate>();
   auto libProviderObj = std::make_shared<BlockIndexStoreLibraryProvider>(libProvider);
@@ -81,7 +81,7 @@ indexstoredb_index_create(const char *storePath, const char *databasePath,
   std::string errMsg;
   if (auto index =
           IndexSystem::create(storePath, databasePath, libProviderObj, delegate,
-                              readonly, llvm::None, errMsg)) {
+                              readonly, listenToUnitEvents, llvm::None, errMsg)) {
 
     return make_object(index);
 
@@ -103,6 +103,10 @@ indexstoredb_load_indexstore_library(const char *dylibPath,
   return nullptr;
 }
 
+void indexstoredb_index_poll_for_unit_changes_and_wait(indexstoredb_index_t index) {
+  auto obj = (IndexStoreDBObject<std::shared_ptr<IndexSystem>> *)index;
+  obj->value->pollForUnitChangesAndWait();
+}
 
 bool
 indexstoredb_index_symbol_occurrences_by_usr(

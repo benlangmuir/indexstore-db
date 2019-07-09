@@ -38,7 +38,8 @@ public final class IndexStoreDB {
     storePath: String,
     databasePath: String,
     library: IndexStoreLibrary?,
-    readonly: Bool = false
+    readonly: Bool = false,
+    listenToUnitEvents: Bool = true
   ) throws {
 
     let libProviderFunc = { (cpath: UnsafePointer<Int8>) -> indexstoredb_indexstore_library_t? in
@@ -46,7 +47,7 @@ public final class IndexStoreDB {
     }
 
     var error: indexstoredb_error_t? = nil
-    guard let index = indexstoredb_index_create(storePath, databasePath, libProviderFunc, readonly, &error) else {
+    guard let index = indexstoredb_index_create(storePath, databasePath, libProviderFunc, readonly, listenToUnitEvents, &error) else {
       defer { indexstoredb_error_dispose(error) }
       throw IndexStoreDBError.create(error?.description ?? "unknown")
     }
@@ -56,6 +57,11 @@ public final class IndexStoreDB {
 
   deinit {
     indexstoredb_release(impl)
+  }
+
+  /// *For Testing* Poll for any changes to units and wait until they have been registered.
+  public func pollForUnitChangesAndWait() {
+    indexstoredb_index_poll_for_unit_changes_and_wait(impl)
   }
 
   @discardableResult

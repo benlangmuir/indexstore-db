@@ -57,13 +57,13 @@ final class TibsTests: XCTestCase {
     let index = try IndexStoreDB(
       storePath: builder.indexstore.path,
       databasePath: tmpDir.path,
-      library: libIndexStore)
+      library: libIndexStore, listenToUnitEvents: false)
 
-    // FIXME: wait for index to load!
-    usleep(100_000)
+    XCTAssertEqual(0, index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition]).count)
 
-    let occs = index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition])
-    XCTAssertEqual(2, occs.count)
+    index.pollForUnitChangesAndWait()
+
+    XCTAssertEqual(2, index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition]).count)
   }
 
   /// The path the the test INPUTS directory.
