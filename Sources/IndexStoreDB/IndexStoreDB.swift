@@ -154,7 +154,10 @@ public struct SymbolRole: OptionSet {
   public static let specializationOf: SymbolRole = SymbolRole(rawValue: INDEXSTOREDB_SYMBOL_ROLE_REL_SPECIALIZATIONOF)
 
   // MARK: Additional IndexStoreDB index roles
-  public static let canonical: SymbolRole = SymbolRole(rawValue: INDEXSTOREDB_SYMBOL_ROLE_CANONICAL)
+
+  // Note: the imported constant INDEXSTOREDB_SYMBOL_ROLE_CANONICAL is signed by default and
+  // fails to construct in Swift.
+  public static let canonical: SymbolRole = SymbolRole(rawValue: 1 << 63)
 
   public init(rawValue: UInt64) {
     self.rawValue = rawValue
@@ -278,7 +281,7 @@ public final class Symbol {
   }
 }
 
-public struct SymbolLocation {
+public struct SymbolLocation: Equatable {
   public var path: String
   public var isSystem: Bool
   public var line: Int

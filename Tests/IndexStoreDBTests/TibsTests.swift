@@ -63,7 +63,18 @@ final class TibsTests: XCTestCase {
 
     index.pollForUnitChangesAndWait()
 
-    XCTAssertEqual(2, index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition]).count)
+    let occs = index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition])
+    XCTAssertEqual(2, occs.count)
+    XCTAssertEqual(occs[0].symbol.name, "c()")
+    XCTAssertEqual(occs[0].symbol.usr, "s:4main1cyyF")
+    if occs[0].roles.contains(.definition) {
+      XCTAssertEqual(occs[0].roles, [.definition, .canonical])
+      let loc = project.locations["c"]!
+      XCTAssertEqual(occs[0].location, SymbolLocation(path: loc.url.path, isSystem: false, line: loc.line, utf8Column: loc.column))
+    } else {
+      let loc = project.locations["c:call"]!
+      XCTAssertEqual(occs[0].location, SymbolLocation(path: loc.url.path, isSystem: false, line: loc.line, utf8Column: loc.column))
+    }
   }
 
   /// The path the the test INPUTS directory.
