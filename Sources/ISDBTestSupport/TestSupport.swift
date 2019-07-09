@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+import IndexStoreDB
 import Foundation
+import XCTest
 
 public struct TestLoc {
   public var url: URL
@@ -272,6 +274,7 @@ public final class TibsBuilder {
           "-output-file-map", target.outputFileMapPath,
           "-emit-module",
           "-emit-module-path", target.emitModulePath,
+          "-working-directory", buildRoot.path,
         ]
         args += target.extraArgs
 
@@ -504,4 +507,137 @@ public final class TestSources {
     self.rootDirectory = rootDirectory
     self.locations = try scanLocations(rootDirectory: rootDirectory, sourceCache: sourceCache)
   }
+}
+
+public final class StaticTibsTestWorkspace {
+
+  public static let defaultToolchain = TibsToolchain(
+    swiftc: findTool(name: "swiftc")!,
+    ninja: findTool(name: "ninja"))
+
+  public var sources: TestSources
+  public var builder: TibsBuilder
+  public var index: IndexStoreDB
+  public let tmpDir: URL
+
+  public init(projectDir: URL, buildDir: URL, tmpDir: URL, toolchain: TibsToolchain = StaticTibsTestWorkspace.defaultToolchain) throws {
+    sources = try TestSources(rootDirectory: projectDir)
+
+    let fm = FileManager.default
+    try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
+
+    let manifestURL = projectDir.appendingPathComponent("project.json")
+    let manifest = try JSONDecoder().decode(TibsManifest.self, from: try Data(contentsOf: manifestURL))
+    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: buildDir, toolchain: toolchain)
+
+    try builder.writeBuildFiles()
+    try fm.createDirectory(at: builder.indexstore, withIntermediateDirectories: true, attributes: nil)
+
+    let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.swiftc
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("lib")
+      .appendingPathComponent("libIndexStore.dylib")
+      .path) // FIXME: non-Mac
+
+    self.tmpDir = tmpDir
+
+    index = try IndexStoreDB(
+      storePath: builder.indexstore.path,
+      databasePath: tmpDir.path,
+      library: libIndexStore, listenToUnitEvents: false)
+  }
+
+  deinit {
+    _ = try? FileManager.default.removeItem(atPath: tmpDir.path)
+  }
+}
+
+extension StaticTibsTestWorkspace {
+
+  public func buildAndIndex() throws {
+    try builder.build()
+    index.pollForUnitChangesAndWait()
+  }
+}
+
+extension StaticTibsTestWorkspace {
+
+  public func testLoc(_ name: String) -> TestLoc { sources.locations[name]! }
+}
+
+extension XCTestCase {
+
+  public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace {
+    let testDirName = testDirectoryName
+    return try StaticTibsTestWorkspace(
+      projectDir: inputsDirectory(testFile: testFile).appendingPathComponent(name),
+      buildDir: productsDirectory
+        .appendingPathComponent("isdb-tests")
+        .appendingPathComponent(testDirName),
+      tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("idsb-test-data")
+        .appendingPathComponent(testDirName))
+  }
+
+  /// The path the the test INPUTS directory.
+  public func inputsDirectory(testFile: String = #file) -> URL {
+    return URL(fileURLWithPath: testFile)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("INPUTS")
+  }
+
+  /// The path to the built products directory.
+  public var productsDirectory: URL {
+    #if os(macOS)
+      for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
+          return bundle.bundleURL.deletingLastPathComponent()
+      }
+      fatalError("couldn't find the products directory")
+    #else
+      return Bundle.main.bundleURL
+    #endif
+  }
+
+  /// The name of this test, mangled for use as a directory.
+  public var testDirectoryName: String {
+    guard name.starts(with: "-[") else {
+      return name
+    }
+
+    let className = name.dropFirst(2).prefix(while: { $0 != " " })
+    let methodName = name[className.endIndex...].dropFirst().prefix(while: { $0 != "]"})
+    return "\(className).\(methodName)"
+  }
+}
+
+/// Returns the path to the given tool, as found by `xcrun --find` on macOS, or `which` on Linux.
+public func findTool(name: String) -> URL? {
+  let p = Process()
+#if os(macOS)
+  p.launchPath = "/usr/bin/xcrun"
+  p.arguments = ["--find", name]
+#else
+  p.launchPath = "/usr/bin/which"
+  p.arguments = [name]
+#endif
+  let out = Pipe()
+  p.standardOutput = out
+
+  p.launch()
+  p.waitUntilExit()
+
+  if p.terminationReason != .exit || p.terminationStatus != 0 {
+    return nil
+  }
+
+  let data = out.fileHandleForReading.readDataToEndOfFile()
+  guard var path = String(data: data, encoding: .utf8) else {
+    return nil
+  }
+  if path.last == "\n" {
+    path = String(path.dropLast())
+  }
+  return URL(fileURLWithPath: path)
 }

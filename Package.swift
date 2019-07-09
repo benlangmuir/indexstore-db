@@ -11,6 +11,9 @@ let package = Package(
     .library(
       name: "IndexStoreDB_CXX",
       targets: ["IndexStoreDB_Index"]),
+    .library(
+      name: "ISDBTestSupport",
+      targets: ["ISDBTestSupport"]),
     .executable(
       name: "tibs",
       targets: ["tibs"])
@@ -26,7 +29,7 @@ let package = Package(
 
     .target(
       name: "ISDBTestSupport",
-      dependencies: []),
+      dependencies: ["IndexStoreDB"]),
 
     .target(
       name: "tibs",
