@@ -369,7 +369,13 @@ public final class TibsBuilder {
 
 extension Data {
   func writeIfChanged(to url: URL, options: Data.WritingOptions = []) throws {
-    let prev = try Data(contentsOf: url)
+    let prev: Data?
+    do {
+      prev = try Data(contentsOf: url)
+    } catch CocoaError.fileReadNoSuchFile {
+      prev = nil
+    }
+
     if prev != self {
       try write(to: url, options: options)
     }
@@ -489,13 +495,13 @@ public func scanLocations(rootDirectory: URL, sourceCache: SourceFileCache) thro
   return scanner.result
 }
 
-public final class TestProject {
-  public var sourceRoot: URL
+public final class TestSources {
+  public var rootDirectory: URL
   public let sourceCache: SourceFileCache = SourceFileCache()
   public var locations: [String: TestLoc]
 
-  public init(sourceRoot: URL) throws {
-    self.sourceRoot = sourceRoot
-    self.locations = try scanLocations(rootDirectory: sourceRoot, sourceCache: sourceCache)
+  public init(rootDirectory: URL) throws {
+    self.rootDirectory = rootDirectory
+    self.locations = try scanLocations(rootDirectory: rootDirectory, sourceCache: sourceCache)
   }
 }
