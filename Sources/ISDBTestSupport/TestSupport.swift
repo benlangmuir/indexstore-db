@@ -39,8 +39,13 @@ public func isSourceFileExtension(_ ext: String) -> Bool {
 ///     {
 ///       "name": "mytarget",
 ///       "swift_flags": ["-warnings-as-errors"],
-///       "sources": ["a.swift", "b.swift"]
-///     }
+///       "sources": ["a.swift", "b.swift"],
+///       "dependencies": ["dep1"],
+///     },
+///     {
+///       "name": "dep1",
+///       "sources": ["dep1.swift"],
+///     },
 ///   ]
 /// }
 /// ```
@@ -107,8 +112,8 @@ public enum TibsCompileUnit {
     public var name: String
     public var extraArgs: [String]
     public var sources: [URL]
-    public var emitModulePath: String { "\(name).swiftmodule" }
-    // FIXME: emitObjCHeaderPath
+    public var emitModulePath: String
+    public var emitHeaderPath: String?
     public var outputFileMap: OutputFileMap
     public var outputFileMapPath: String { "\(name)-output-file-map.json" }
     public var bridgingHeader: URL?
@@ -119,6 +124,9 @@ public enum TibsCompileUnit {
   public struct ClangTU {
     public var extraArgs: [String]
     public var source: URL
+    public var importPaths: [String]
+    public var generatedHeaderDep: String?
+    public var outputPath: String
   }
 }
 
@@ -136,10 +144,12 @@ public final class TibsResolvedTarget {
 
 public struct TibsToolchain {
   public var swiftc: URL
+  public var clang: URL
   public var ninja: URL? = nil
 
-  public init(swiftc: URL, ninja: URL? = nil) {
+  public init(swiftc: URL, clang: URL, ninja: URL? = nil) {
     self.swiftc = swiftc
+    self.clang = clang
     self.ninja = ninja
   }
 }
@@ -290,6 +300,8 @@ public final class TibsBuilder {
           name: name,
           extraArgs: swiftFlags + clangFlags.flatMap { ["-Xcc", $0] },
           sources: swiftSources,
+          emitModulePath: "\(name).swiftmodule",
+          emitHeaderPath: clangSources.isEmpty ? nil : "\(name)-Swift.h",
           outputFileMap: outputFileMap,
           bridgingHeader: bridgingHeader,
           moduleDeps: targetDesc.dependencies?.map { "\($0).swiftmodule" } ?? [])
@@ -300,7 +312,10 @@ public final class TibsBuilder {
       for source in clangSources {
         let cu = TibsCompileUnit.ClangTU(
           extraArgs: clangFlags,
-          source: source)
+          source: source,
+          importPaths: [/*buildRoot*/".", sourceRoot.path],
+          generatedHeaderDep: swiftSources.isEmpty ? nil : "\(name)-Swift.h",
+          outputPath: "\(name)-\(source.lastPathComponent).o")
         compileUnits.append(.clangTranslationUnit(cu))
       }
 
@@ -340,10 +355,16 @@ public final class TibsBuilder {
             "-output-file-map", module.outputFileMapPath,
             "-emit-module",
             "-emit-module-path", module.emitModulePath,
-            "-working-directory", buildRoot.path,
           ]
+          args += module.emitHeaderPath.map { [
+            "-emit-objc-header",
+            "-emit-objc-header-path", $0
+          ] } ?? []
           args += module.bridgingHeader.map { ["-import-objc-header", $0.path] } ?? []
           args += module.extraArgs
+
+          // FIXME: handle via 'directory' field?
+          args += ["-working-directory", buildRoot.path]
 
           module.sources.forEach { sourceFile in
             commands.append(JSONCompilationDatabase.Command(
@@ -425,8 +446,14 @@ public final class TibsBuilder {
     stream.write("""
       rule swiftc_index
         description = Indexing Swift Module $MODULE_NAME
-        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $BRIDGING_HEADER $EXTRA_ARGS
+        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $EMIT_HEADER $BRIDGING_HEADER $EXTRA_ARGS
         restat = 1 # Swift doesn't rewrite modules that haven't changed
+
+      rule cc_index
+        description = Indexing $in
+        command = \(toolchain.clang.path) -fsyntax-only $in $IMPORT_PATHS -index-store-path index -index-ignore-system-symbols -MMD -MF $OUTPUT_NAME.d -o $out $EXTRA_ARGS && touch $out
+        depfile = $out.d
+        deps = gcc
       """)
   }
 
@@ -435,14 +462,15 @@ public final class TibsBuilder {
       switch cu {
       case .swiftModule(let module):
         writeNinjaSnippet(for: module, to: &stream)
-      case .clangTranslationUnit(_):
-        break
+      case .clangTranslationUnit(let tu):
+        writeNinjaSnippet(for: tu, to: &stream)
       }
+      stream.write("\n\n")
     }
   }
 
   public func writeNinjaSnippet<Output: TextOutputStream>(for module: TibsCompileUnit.SwiftModule, to stream: inout Output) {
-    let outputs = [module.emitModulePath]
+    let outputs = [module.emitModulePath, module.emitHeaderPath].compactMap{$0}
     // FIXME: some of these are deleted by the compiler!?
     // outputs += target.outputFileMap.allOutputs
 
@@ -461,8 +489,20 @@ public final class TibsBuilder {
         MODULE_PATH = \(module.emitModulePath)
         IMPORT_PATHS = \(module.importPaths.map { "-I \($0)" }.joined(separator: " "))
         BRIDGING_HEADER = \(module.bridgingHeader.map { "-import-objc-header \($0.path)" } ?? "")
+        EMIT_HEADER = \(module.emitHeaderPath.map { "-emit-objc-header -emit-objc-header-path \($0)" } ?? "")
         EXTRA_ARGS = \(module.extraArgs.joined(separator: " "))
         OUTPUT_FILE_MAP = \(module.outputFileMapPath)
+      """)
+  }
+
+  public func writeNinjaSnippet<Output: TextOutputStream>(for tu: TibsCompileUnit.ClangTU, to stream: inout Output) {
+
+    stream.write("""
+      build \(tu.outputPath): \
+      cc_index \(tu.source.path) | \(tu.generatedHeaderDep ?? "") \(toolchain.clang.path)
+        IMPORT_PATHS = \(tu.importPaths.map { "-I \($0)" }.joined(separator: " "))
+        OUTPUT_NAME = \(tu.outputPath)
+        EXTRA_ARGS = \(tu.extraArgs.joined(separator: " "))
       """)
   }
 }
@@ -610,6 +650,7 @@ public final class StaticTibsTestWorkspace {
 
   public static let defaultToolchain = TibsToolchain(
     swiftc: findTool(name: "swiftc")!,
+    clang: findTool(name: "clang")!,
     ninja: findTool(name: "ninja"))
 
   public var sources: TestSources

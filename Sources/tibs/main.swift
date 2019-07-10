@@ -47,7 +47,7 @@ func main(arguments: [String]) {
 
   let builder: TibsBuilder
   do {
-    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: cwd, toolchain: TibsToolchain(swiftc: URL(fileURLWithPath: "/usr/bin/swiftc")))
+    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: cwd, toolchain: TibsToolchain(swiftc: URL(fileURLWithPath: "/usr/bin/swiftc"), clang: URL(fileURLWithPath: "/usr/bin/clang")))
   } catch {
     print("error: could not resolve project '\(manifestURL.path)': \(error)", to: &stderr)
     exit(1)
