@@ -3,4 +3,4 @@ func test(c: C) {
   bridgingHeader()
 }
 
-@_cdecl("foo") public func foo() { }
+@_cdecl("fo") public func foo() { }

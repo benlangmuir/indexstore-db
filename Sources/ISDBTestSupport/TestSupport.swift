@@ -446,14 +446,14 @@ public final class TibsBuilder {
     stream.write("""
       rule swiftc_index
         description = Indexing Swift Module $MODULE_NAME
-        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER $BRIDGING_HEADER $EXTRA_ARGS && DYLD_FRAMEWORK_PATH=/Xcodes/Y/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks /Users/blangmuir/src/lsp/indexstore-db/.build/debug/tibs swift-deps-merge $out $DEP_FILES > $out.d
+        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER $BRIDGING_HEADER -module-cache-path ModuleCache $EXTRA_ARGS && DYLD_FRAMEWORK_PATH=/Xcodes/Y/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks /Users/blangmuir/src/lsp/indexstore-db/.build/debug/tibs swift-deps-merge $out $DEP_FILES > $out.d
         depfile = $out.d
         deps = gcc
         restat = 1 # Swift doesn't rewrite modules that haven't changed
 
       rule cc_index
         description = Indexing $in
-        command = \(toolchain.clang.path) -fsyntax-only $in $IMPORT_PATHS -index-store-path index -index-ignore-system-symbols -fmodules -MMD -MF $OUTPUT_NAME.d -o $out $EXTRA_ARGS && touch $out
+        command = \(toolchain.clang.path) -fsyntax-only $in $IMPORT_PATHS -index-store-path index -index-ignore-system-symbols -fmodules -fmodules-cache-path=ModuleCache -MMD -MF $OUTPUT_NAME.d -o $out $EXTRA_ARGS && touch $out
         depfile = $out.d
         deps = gcc
       """)
