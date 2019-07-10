@@ -1,0 +1,11 @@
+{
+  "sources": [
+    "a.swift",
+    "b.swift",
+    "b.c",
+    "c.m",
+    "d.cpp",
+    "e.mm",
+  ],
+  "bridging_header": "bridging-header.h"
+}

@@ -158,13 +158,10 @@ public struct OutputFileMap {
   public struct Entry: Hashable, Codable {
     public var swiftmodule: String?
     public var swiftdoc: String?
-
-    public var allOutputs: [String] { [swiftmodule, swiftdoc].compactMap{ $0 } }
+    public var dependencies: String?
   }
 
   public var value: [String: Entry] = [:]
-
-  public var allOutputs: [String] { value.flatMap { key, entry in entry.allOutputs } }
 
   public subscript(file: String) -> Entry? {
     get { value[file] }
@@ -291,9 +288,9 @@ public final class TibsBuilder {
         for source in swiftSources {
           let basename = source.lastPathComponent
           outputFileMap[source.path] = OutputFileMap.Entry(
-            swiftmodule: "\(basename).swiftmodule~partial",
-            swiftdoc: "\(basename).swiftdoc~partial"
-          )
+            swiftmodule: "\(name)-\(basename).swiftmodule~partial",
+            swiftdoc: "\(name)-\(basename).swiftdoc~partial",
+            dependencies: "\(name)-\(basename).d")
         }
 
         let cu = TibsCompileUnit.SwiftModule(
@@ -314,7 +311,10 @@ public final class TibsBuilder {
           extraArgs: clangFlags,
           source: source,
           importPaths: [/*buildRoot*/".", sourceRoot.path],
-          generatedHeaderDep: swiftSources.isEmpty ? nil : "\(name)-Swift.h",
+          // FIXME: this should be the -Swift.h file, but ninja doesn't support
+          // having multiple output files when using gcc-style dependencies, so
+          // use the .swiftmodule.
+          generatedHeaderDep: swiftSources.isEmpty ? nil : "\(name).swiftmodule",
           outputPath: "\(name)-\(source.lastPathComponent).o")
         compileUnits.append(.clangTranslationUnit(cu))
       }
@@ -446,12 +446,14 @@ public final class TibsBuilder {
     stream.write("""
       rule swiftc_index
         description = Indexing Swift Module $MODULE_NAME
-        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $EMIT_HEADER $BRIDGING_HEADER $EXTRA_ARGS
+        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER $BRIDGING_HEADER $EXTRA_ARGS && DYLD_FRAMEWORK_PATH=/Xcodes/Y/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks /Users/blangmuir/src/lsp/indexstore-db/.build/debug/tibs swift-deps-merge $out $DEP_FILES > $out.d
+        depfile = $out.d
+        deps = gcc
         restat = 1 # Swift doesn't rewrite modules that haven't changed
 
       rule cc_index
         description = Indexing $in
-        command = \(toolchain.clang.path) -fsyntax-only $in $IMPORT_PATHS -index-store-path index -index-ignore-system-symbols -MMD -MF $OUTPUT_NAME.d -o $out $EXTRA_ARGS && touch $out
+        command = \(toolchain.clang.path) -fsyntax-only $in $IMPORT_PATHS -index-store-path index -index-ignore-system-symbols -fmodules -MMD -MF $OUTPUT_NAME.d -o $out $EXTRA_ARGS && touch $out
         depfile = $out.d
         deps = gcc
       """)
@@ -470,7 +472,9 @@ public final class TibsBuilder {
   }
 
   public func writeNinjaSnippet<Output: TextOutputStream>(for module: TibsCompileUnit.SwiftModule, to stream: inout Output) {
-    let outputs = [module.emitModulePath, module.emitHeaderPath].compactMap{$0}
+    // FIXME: the generated -Swift.h header should be considered an output, but ninja does not
+    // support multiple outputs when using gcc-style .d files.
+    let outputs = [module.emitModulePath, /*module.emitHeaderPath*/]
     // FIXME: some of these are deleted by the compiler!?
     // outputs += target.outputFileMap.allOutputs
 
@@ -482,7 +486,7 @@ public final class TibsBuilder {
     }
 
     stream.write("""
-      build \(outputs.joined(separator: " ")): \
+      build \(outputs.joined(separator: " ")) : \
       swiftc_index \(module.sources.map { $0.path }.joined(separator: " ")) \
       | \(deps.joined(separator: " "))
         MODULE_NAME = \(module.name)
@@ -491,6 +495,7 @@ public final class TibsBuilder {
         BRIDGING_HEADER = \(module.bridgingHeader.map { "-import-objc-header \($0.path)" } ?? "")
         EMIT_HEADER = \(module.emitHeaderPath.map { "-emit-objc-header -emit-objc-header-path \($0)" } ?? "")
         EXTRA_ARGS = \(module.extraArgs.joined(separator: " "))
+        DEP_FILES = \(module.outputFileMap.value.values.compactMap { $0.dependencies }.joined(separator: " "))
         OUTPUT_FILE_MAP = \(module.outputFileMapPath)
       """)
   }
@@ -499,7 +504,7 @@ public final class TibsBuilder {
 
     stream.write("""
       build \(tu.outputPath): \
-      cc_index \(tu.source.path) | \(tu.generatedHeaderDep ?? "") \(toolchain.clang.path)
+      cc_index \(tu.source.path) | \(toolchain.clang.path) \(tu.generatedHeaderDep ?? "")
         IMPORT_PATHS = \(tu.importPaths.map { "-I \($0)" }.joined(separator: " "))
         OUTPUT_NAME = \(tu.outputPath)
         EXTRA_ARGS = \(tu.extraArgs.joined(separator: " "))
