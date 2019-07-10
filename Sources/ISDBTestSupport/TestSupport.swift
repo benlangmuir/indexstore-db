@@ -38,7 +38,7 @@ public func isSourceFileExtension(_ ext: String) -> Bool {
 ///   "targets": [
 ///     {
 ///       "name": "mytarget",
-///       "compiler_arguments": ["-warnings-as-errors"],
+///       "swift_flags": ["-warnings-as-errors"],
 ///       "sources": ["a.swift", "b.swift"]
 ///     }
 ///   ]
@@ -53,14 +53,27 @@ public func isSourceFileExtension(_ ext: String) -> Bool {
 /// ```
 public struct TibsManifest {
 
-  public struct Target: Codable {
+  public struct Target {
     public var name: String? = nil
-    public var compilerArguments: [String]? = nil
+    public var swiftFlags: [String]? = nil
+    public var clangFlags: [String]? = nil
     public var sources: [String]
+    public var bridgingHeader: String? = nil
     public var dependencies: [String]? = nil
   }
 
   public var targets: [Target]
+}
+
+extension TibsManifest.Target: Codable {
+  private enum CodingKeys: String, CodingKey {
+    case name
+    case swiftFlags = "swift_flags"
+    case clangFlags = "clang_flags"
+    case sources
+    case bridgingHeader = "bridging_header"
+    case dependencies
+  }
 }
 
 extension TibsManifest: Codable {
@@ -86,15 +99,39 @@ extension TibsManifest: Codable {
   }
 }
 
-public struct TibsResolvedTarget {
+public enum TibsCompileUnit {
+  case swiftModule(SwiftModule)
+  case clangTranslationUnit(ClangTU)
+
+  public struct SwiftModule {
+    public var name: String
+    public var extraArgs: [String]
+    public var sources: [URL]
+    public var emitModulePath: String { "\(name).swiftmodule" }
+    // FIXME: emitObjCHeaderPath
+    public var outputFileMap: OutputFileMap
+    public var outputFileMapPath: String { "\(name)-output-file-map.json" }
+    public var bridgingHeader: URL?
+    public var moduleDeps: [String]
+    public var importPaths: [String] { moduleDeps.isEmpty ? [] : ["."] }
+  }
+
+  public struct ClangTU {
+    public var extraArgs: [String]
+    public var source: URL
+  }
+}
+
+public final class TibsResolvedTarget {
   public var name: String
-  public var extraArgs: [String]
-  public var sources: [URL]
-  public var emitModulePath: String { "\(name).swiftmodule" }
-  public var outputFileMap: OutputFileMap
-  public var outputFileMapPath: String { "\(name)-output-file-map.json" }
+  public var compileUnits: [TibsCompileUnit]
   public var dependencies: [String]
-  public var importPaths: [String] { dependencies.isEmpty ? [] : ["."] }
+
+  public init(name: String, compileUnits: [TibsCompileUnit], dependencies: [String]) {
+    self.name = name
+    self.compileUnits = compileUnits
+    self.dependencies = dependencies
+  }
 }
 
 public struct TibsToolchain {
@@ -227,21 +264,49 @@ public final class TibsBuilder {
       let sources = targetDesc.sources.map {
         URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: sourceRoot)
       }
+      let bridgingHeader = targetDesc.bridgingHeader.map {
+        URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: sourceRoot)
+      }
 
-      var outputFileMap = OutputFileMap()
-      for source in sources {
-        let basename = source.lastPathComponent
-        outputFileMap[source.path] = OutputFileMap.Entry(
-          swiftmodule: "\(basename).swiftmodule~partial",
-          swiftdoc: "\(basename).swiftdoc~partial"
-        )
+      let swiftFlags = targetDesc.swiftFlags ?? []
+      let clangFlags = targetDesc.clangFlags ?? []
+
+      let swiftSources = sources.filter { $0.pathExtension == "swift" }
+      let clangSources = sources.filter { $0.pathExtension != "swift" }
+
+      var compileUnits = [TibsCompileUnit]()
+
+      if !swiftSources.isEmpty {
+        var outputFileMap = OutputFileMap()
+        for source in swiftSources {
+          let basename = source.lastPathComponent
+          outputFileMap[source.path] = OutputFileMap.Entry(
+            swiftmodule: "\(basename).swiftmodule~partial",
+            swiftdoc: "\(basename).swiftdoc~partial"
+          )
+        }
+
+        let cu = TibsCompileUnit.SwiftModule(
+          name: name,
+          extraArgs: swiftFlags + clangFlags.flatMap { ["-Xcc", $0] },
+          sources: swiftSources,
+          outputFileMap: outputFileMap,
+          bridgingHeader: bridgingHeader,
+          moduleDeps: targetDesc.dependencies?.map { "\($0).swiftmodule" } ?? [])
+
+        compileUnits.append(.swiftModule(cu))
+      }
+
+      for source in clangSources {
+        let cu = TibsCompileUnit.ClangTU(
+          extraArgs: clangFlags,
+          source: source)
+        compileUnits.append(.clangTranslationUnit(cu))
       }
 
       let target = TibsResolvedTarget(
         name: name,
-        extraArgs: targetDesc.compilerArguments ?? [],
-        sources: sources,
-        outputFileMap: outputFileMap,
+        compileUnits: compileUnits,
         dependencies: targetDesc.dependencies ?? [])
 
       targets.append(target)
@@ -261,30 +326,38 @@ public final class TibsBuilder {
 
   public var compilationDatabase: JSONCompilationDatabase {
     var commands = [JSONCompilationDatabase.Command]()
-    targets
-      .sorted(by: { a, b in a.emitModulePath < b.emitModulePath })
-      .forEach { target in
-        var args = [toolchain.swiftc.path]
-        args += target.sources.map { $0.path }
-        args += target.importPaths.flatMap { ["-I", $0] }
-        args += [
-          "-module-name", target.name,
-          "-index-store-path", indexstore.path,
-          "-index-ignore-system-modules",
-          "-output-file-map", target.outputFileMapPath,
-          "-emit-module",
-          "-emit-module-path", target.emitModulePath,
-          "-working-directory", buildRoot.path,
-        ]
-        args += target.extraArgs
+    for target in targets {
+      for cu in target.compileUnits {
+        switch cu {
+        case .swiftModule(let module):
+          var args = [toolchain.swiftc.path]
+          args += module.sources.map { $0.path }
+          args += module.importPaths.flatMap { ["-I", $0] }
+          args += [
+            "-module-name", module.name,
+            "-index-store-path", indexstore.path,
+            "-index-ignore-system-modules",
+            "-output-file-map", module.outputFileMapPath,
+            "-emit-module",
+            "-emit-module-path", module.emitModulePath,
+            "-working-directory", buildRoot.path,
+          ]
+          args += module.bridgingHeader.map { ["-import-objc-header", $0.path] } ?? []
+          args += module.extraArgs
 
-        target.sources.forEach { sourceFile in
-          commands.append(JSONCompilationDatabase.Command(
-            directory: buildRoot.path,
-            file: sourceFile.path,
-            arguments: args))
+          module.sources.forEach { sourceFile in
+            commands.append(JSONCompilationDatabase.Command(
+              directory: buildRoot.path,
+              file: sourceFile.path,
+              arguments: args))
+          }
+
+        case .clangTranslationUnit(_):
+          break
         }
       }
+    }
+
     return JSONCompilationDatabase(commands: commands)
   }
 
@@ -299,8 +372,15 @@ public final class TibsBuilder {
     let compdb = try encoder.encode(compilationDatabase)
     try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
     for target in targets {
-      let ofm = try encoder.encode(target.outputFileMap)
-      try ofm.writeIfChanged(to: buildRoot.appendingPathComponent(target.outputFileMapPath))
+      for cu in target.compileUnits {
+        switch cu {
+        case .swiftModule(let module):
+          let ofm = try encoder.encode(module.outputFileMap)
+          try ofm.writeIfChanged(to: buildRoot.appendingPathComponent(module.outputFileMapPath))
+        default:
+          break
+        }
+      }
     }
   }
 
@@ -345,27 +425,44 @@ public final class TibsBuilder {
     stream.write("""
       rule swiftc_index
         description = Indexing Swift Module $MODULE_NAME
-        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $EXTRA_ARGS
+        command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME -index-store-path index -index-ignore-system-modules -output-file-map $OUTPUT_FILE_MAP -emit-module -emit-module-path $MODULE_PATH $BRIDGING_HEADER $EXTRA_ARGS
         restat = 1 # Swift doesn't rewrite modules that haven't changed
       """)
   }
 
   public func writeNinjaSnippet<Output: TextOutputStream>(for target: TibsResolvedTarget, to stream: inout Output) {
-    let outputs = [target.emitModulePath]
+    for cu in target.compileUnits {
+      switch cu {
+      case .swiftModule(let module):
+        writeNinjaSnippet(for: module, to: &stream)
+      case .clangTranslationUnit(_):
+        break
+      }
+    }
+  }
+
+  public func writeNinjaSnippet<Output: TextOutputStream>(for module: TibsCompileUnit.SwiftModule, to stream: inout Output) {
+    let outputs = [module.emitModulePath]
     // FIXME: some of these are deleted by the compiler!?
     // outputs += target.outputFileMap.allOutputs
 
-    let swiftDeps = target.dependencies.map { dep in targetsByName[dep]!.emitModulePath }
+    var deps = module.moduleDeps
+    deps.append(module.outputFileMapPath)
+    deps.append(toolchain.swiftc.path)
+    if let bridgingHeader = module.bridgingHeader {
+      deps.append(bridgingHeader.path)
+    }
 
     stream.write("""
       build \(outputs.joined(separator: " ")): \
-      swiftc_index \(target.sources.map{ $0.path }.joined(separator: " ")) \
-      | \(swiftDeps.joined(separator: " ")) \(target.outputFileMapPath) \(toolchain.swiftc.path)
-        MODULE_NAME = \(target.name)
-        MODULE_PATH = \(target.emitModulePath)
-        IMPORT_PATHS = \(target.importPaths.map { "-I \($0)" }.joined(separator: " "))
-        EXTRA_ARGS = \(target.extraArgs.joined(separator: " "))
-        OUTPUT_FILE_MAP = \(target.outputFileMapPath)
+      swiftc_index \(module.sources.map { $0.path }.joined(separator: " ")) \
+      | \(deps.joined(separator: " "))
+        MODULE_NAME = \(module.name)
+        MODULE_PATH = \(module.emitModulePath)
+        IMPORT_PATHS = \(module.importPaths.map { "-I \($0)" }.joined(separator: " "))
+        BRIDGING_HEADER = \(module.bridgingHeader.map { "-import-objc-header \($0.path)" } ?? "")
+        EXTRA_ARGS = \(module.extraArgs.joined(separator: " "))
+        OUTPUT_FILE_MAP = \(module.outputFileMapPath)
       """)
   }
 }
