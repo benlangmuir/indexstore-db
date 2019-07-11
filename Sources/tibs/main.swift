@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ISDBTestSupport
+import ISDBTibs
 import Foundation
 
 extension FileHandle: TextOutputStream {

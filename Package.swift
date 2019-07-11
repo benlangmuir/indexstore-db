@@ -27,17 +27,26 @@ let package = Package(
       name: "IndexStoreDB",
       dependencies: ["IndexStoreDB_CIndexStoreDB"]),
 
-    .target(
-      name: "ISDBTestSupport",
-      dependencies: ["IndexStoreDB"]),
-
-    .target(
-      name: "tibs",
-      dependencies: ["ISDBTestSupport"]),
-
     .testTarget(
       name: "IndexStoreDBTests",
       dependencies: ["IndexStoreDB", "ISDBTestSupport"]),
+
+    // MARK: Swift Test Infrastructure
+
+    // The Test Index Build System (tibs) library.
+    .target(
+      name: "ISDBTibs",
+      dependencies: []),
+
+    // Commandline tool for working with tibs projects.
+    .target(
+      name: "tibs",
+      dependencies: ["ISDBTibs"]),
+
+    // Test support library, built on top of tibs.
+    .target(
+      name: "ISDBTestSupport",
+      dependencies: ["IndexStoreDB", "ISDBTibs"]),
 
     // MARK: C++ interface
 
