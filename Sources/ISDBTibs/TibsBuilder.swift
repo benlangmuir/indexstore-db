@@ -224,6 +224,7 @@ extension TibsBuilder {
           -index-store-path index -index-ignore-system-modules \
           -output-file-map $OUTPUT_FILE_MAP \
           -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER \
+          -pch-output-dir pch \
           $BRIDGING_HEADER -module-cache-path ModuleCache $EXTRA_ARGS \
           && \(toolchain.tibs.path) swift-deps-merge $out $DEP_FILES > $out.d
         depfile = $out.d
