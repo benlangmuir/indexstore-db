@@ -229,7 +229,7 @@ extension TibsBuilder {
           -output-file-map $OUTPUT_FILE_MAP \
           -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER \
           $BRIDGING_HEADER -module-cache-path ModuleCache $EXTRA_ARGS \
-          && /Users/blangmuir/src/lsp/indexstore-db/.build/debug/tibs swift-deps-merge $out $DEP_FILES > $out.d
+          && \(toolchain.tibs.path) swift-deps-merge $out $DEP_FILES > $out.d
         depfile = $out.d
         deps = gcc
         restat = 1 # Swift doesn't rewrite modules that haven't changed

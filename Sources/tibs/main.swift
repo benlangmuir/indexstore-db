@@ -82,9 +82,14 @@ func main(arguments: [String]) {
 
   let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
 
+  let toolchain = TibsToolchain(
+    swiftc: URL(fileURLWithPath: "/usr/bin/swiftc"),
+    clang: URL(fileURLWithPath: "/usr/bin/clang"),
+    tibs: Bundle.main.bundleURL.appendingPathComponent("tibs"))
+
   let builder: TibsBuilder
   do {
-    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: cwd, toolchain: TibsToolchain(swiftc: URL(fileURLWithPath: "/usr/bin/swiftc"), clang: URL(fileURLWithPath: "/usr/bin/clang")))
+    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: cwd, toolchain: toolchain)
   } catch {
     print("error: could not resolve project '\(manifestURL.path)': \(error)", to: &stderr)
     exit(1)

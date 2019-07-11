@@ -16,11 +16,13 @@ import struct Foundation.URL
 public struct TibsToolchain {
   public var swiftc: URL
   public var clang: URL
+  public var tibs: URL
   public var ninja: URL? = nil
 
-  public init(swiftc: URL, clang: URL, ninja: URL? = nil) {
+  public init(swiftc: URL, clang: URL, tibs: URL, ninja: URL? = nil) {
     self.swiftc = swiftc
     self.clang = clang
+    self.tibs = tibs
     self.ninja = ninja
   }
 }

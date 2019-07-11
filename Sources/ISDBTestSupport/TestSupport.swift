@@ -184,6 +184,7 @@ public final class StaticTibsTestWorkspace {
   public static let defaultToolchain = TibsToolchain(
     swiftc: findTool(name: "swiftc")!,
     clang: findTool(name: "clang")!,
+    tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs"),
     ninja: findTool(name: "ninja"))
 
   public var sources: TestSources
@@ -243,7 +244,7 @@ extension XCTestCase {
     let testDirName = testDirectoryName
     return try StaticTibsTestWorkspace(
       projectDir: inputsDirectory(testFile: testFile).appendingPathComponent(name),
-      buildDir: productsDirectory
+      buildDir: XCTestCase.productsDirectory
         .appendingPathComponent("isdb-tests")
         .appendingPathComponent(testDirName),
       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
@@ -260,7 +261,7 @@ extension XCTestCase {
   }
 
   /// The path to the built products directory.
-  public var productsDirectory: URL {
+  public static var productsDirectory: URL {
     #if os(macOS)
       for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
           return bundle.bundleURL.deletingLastPathComponent()
