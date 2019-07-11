@@ -135,7 +135,7 @@ public final class SymbolRelation {
   }
 }
 
-public struct SymbolRole: OptionSet {
+public struct SymbolRole: OptionSet, Hashable {
 
   public var rawValue: UInt64
 
@@ -207,6 +207,108 @@ public enum IndexSymbolKind {
   case using
 
   case commentTag
+}
+
+
+extension SymbolRole: Comparable {
+  public static func <(a: SymbolRole, b: SymbolRole) -> Bool {
+    return a.rawValue < b.rawValue
+  }
+}
+
+extension SymbolRole: CustomStringConvertible {
+  public var description: String {
+    if self.isEmpty { return "[]" }
+
+    var value = self
+    var desc = ""
+    if contains(.declaration) {
+      value.subtract(.declaration)
+      desc += "decl|"
+    }
+    if contains(.definition) {
+      value.subtract(.definition)
+      desc += "def|"
+    }
+    if contains(.reference) {
+      value.subtract(.reference)
+      desc += "ref|"
+    }
+    if contains(.read) {
+      value.subtract(.read)
+      desc += "read|"
+    }
+    if contains(.write) {
+      value.subtract(.write)
+      desc += "write|"
+    }
+    if contains(.call) {
+      value.subtract(.call)
+      desc += "call|"
+    }
+    if contains(.`dynamic`) {
+      value.subtract(.`dynamic`)
+      desc += "dyn|"
+    }
+    if contains(.addressOf) {
+      value.subtract(.addressOf)
+      desc += "addrOf|"
+    }
+    if contains(.implicit) {
+      value.subtract(.implicit)
+      desc += "implicit|"
+    }
+    if contains(.childOf) {
+      value.subtract(.childOf)
+      desc += "childOf|"
+    }
+    if contains(.baseOf) {
+      value.subtract(.baseOf)
+      desc += "baseOf|"
+    }
+    if contains(.overrideOf) {
+      value.subtract(.overrideOf)
+      desc += "overrideOf|"
+    }
+    if contains(.receivedBy) {
+      value.subtract(.receivedBy)
+      desc += "recBy|"
+    }
+    if contains(.calledBy) {
+      value.subtract(.calledBy)
+      desc += "calledBy|"
+    }
+    if contains(.extendedBy) {
+      value.subtract(.extendedBy)
+      desc += "extendedBy|"
+    }
+    if contains(.accessorOf) {
+      value.subtract(.accessorOf)
+      desc += "accOf|"
+    }
+    if contains(.containedBy) {
+      value.subtract(.containedBy)
+      desc += "contBy|"
+    }
+    if contains(.ibTypeOf) {
+      value.subtract(.ibTypeOf)
+      desc += "ibTypeOf|"
+    }
+    if contains(.specializationOf) {
+      value.subtract(.specializationOf)
+      desc += "specializationOf|"
+    }
+    if contains(.canonical) {
+      value.subtract(.canonical)
+      desc += "canon|"
+    }
+    
+    if !value.isEmpty {
+      desc += "<<unknown roles \(value.rawValue)>>"
+    }
+
+    return "[\(desc.dropLast())]"
+  }
 }
 
 public final class Symbol {
@@ -290,6 +392,21 @@ public final class Symbol {
   }
 }
 
+extension Symbol: Equatable, Comparable {
+  public static func ==(a: Symbol, b: Symbol) -> Bool {
+    return (a.usr, a.name) == (b.usr, b.name)
+  }
+  public static func <(a: Symbol, b: Symbol) -> Bool {
+    return (a.usr, a.name) < (b.usr, b.name)
+  }
+}
+
+extension Symbol: CustomStringConvertible {
+  public var description: String {
+    "\(name) [\(usr)]"
+  }
+}
+
 public struct SymbolLocation: Equatable {
   public var path: String
   public var isSystem: Bool
@@ -308,6 +425,19 @@ public struct SymbolLocation: Equatable {
     isSystem = indexstoredb_symbol_location_is_system(loc)
     line = Int(indexstoredb_symbol_location_line(loc))
     utf8Column = Int(indexstoredb_symbol_location_column_utf8(loc))
+  }
+}
+
+extension SymbolLocation: Comparable {
+  public static func <(a: SymbolLocation, b: SymbolLocation) -> Bool {
+    return (a.path, a.line, a.utf8Column, a.isSystem ? 1 : 0)
+      < (b.path, b.line, b.utf8Column, b.isSystem ? 1 : 0)
+  }
+}
+
+extension SymbolLocation: CustomStringConvertible {
+  public var description: String {
+    "\(path):\(line):\(utf8Column)\(isSystem ? " [system]" : "")"
   }
 }
 
@@ -343,6 +473,21 @@ public final class SymbolOccurrence {
     return indexstoredb_symbol_occurrence_relations(value){ relation in
       body(SymbolRelation(relation))
     }
+  }
+}
+
+extension SymbolOccurrence: Equatable, Comparable {
+  public static func ==(a: SymbolOccurrence, b: SymbolOccurrence) -> Bool {
+    return (a.symbol, a.roles, a.location) == (b.symbol, b.roles, b.location)
+  }
+  public static func <(a: SymbolOccurrence, b: SymbolOccurrence) -> Bool {
+    return (a.location, a.roles, a.symbol) < (b.location, b.roles, b.symbol)
+  }
+}
+
+extension SymbolOccurrence: CustomStringConvertible {
+  public var description: String {
+    "\(symbol) @\(location) roles:\(roles)"
   }
 }
 

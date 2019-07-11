@@ -47,19 +47,83 @@ final class TibsTests: XCTestCase {
     try ws.buildAndIndex()
     let index = ws.index
 
-    let cdecl = ws.testLoc("C:decl")
-    let cdeclLookup = index.occurrences(atPath: cdecl.url.path, line: cdecl.line, utf8Column: cdecl.column, roles: [.definition, .declaration, .reference])
+    let cdeclOccs = index.occurrences(ofUSR: "c:objc(cs)C", roles: [.definition, .declaration, .reference])
+    checkOccurrences(cdeclOccs, usr: "c:objc(cs)C", locations: [
+      ws.testLoc("C:decl"),
+      ws.testLoc("C:def"),
+      ws.testLoc("C:ref:swift"),
+      ws.testLoc("C:ref:e.mm"),
+    ])
 
-    XCTAssertEqual(1, cdeclLookup.count)
-    guard let cdeclDecl = cdeclLookup.first else { return }
-    XCTAssertEqual(cdeclDecl.roles, [.declaration, .canonical])
-    XCTAssertEqual(cdeclDecl.symbol.name, "C")
-    XCTAssertEqual(cdeclDecl.symbol.usr, "c:objc(cs)C")
-    XCTAssertEqual(cdeclDecl.location.path, cdecl.url.path)
-    XCTAssertEqual(cdeclDecl.location.line, cdecl.line)
-    XCTAssertEqual(cdeclDecl.location.utf8Column, cdecl.column)
+    let cmethodOccs = index.occurrences(ofUSR: "c:objc(cs)C(im)method", roles: [.definition, .declaration, .reference])
+    checkOccurrences(cmethodOccs, usr: "c:objc(cs)C(im)method", locations: [
+      ws.testLoc("C.method:call:swift"),
+      ws.testLoc("C.method:decl"),
+      ws.testLoc("C.method:def"),
+      ws.testLoc("C.method:call:e.mm"),
+    ])
 
-    let cdeclOccs = index.occurrences(ofUSR: cdeclDecl.symbol.usr, roles: [.definition, .declaration, .reference])
-    XCTAssertEqual(4, cdeclOccs.count)
+    let dOccs = index.occurrences(ofUSR: "c:@S@D", roles: [.definition, .declaration, .reference])
+    checkOccurrences(dOccs, usr: "c:@S@D", locations: [
+      ws.testLoc("D:def"),
+      ws.testLoc("D:ref"),
+      ws.testLoc("D:ref:e.mm"),
+    ])
+
+    let bridgingHeaderOccs = index.occurrences(ofUSR: "c:@F@bridgingHeader", roles: [.definition, .declaration, .reference])
+    checkOccurrences(bridgingHeaderOccs, usr: "c:@F@bridgingHeader", locations: [
+      ws.testLoc("bridgingHeader:call"),
+      ws.testLoc("bridgingHeader:decl"),
+    ])
+  }
+}
+
+func checkOccurrences(
+  _ occurs: [SymbolOccurrence],
+  usr: String,
+  locations: [TestLoc],
+  file: StaticString = #file,
+  line: UInt = #line)
+{
+  let occurs = occurs.sorted()
+  let locations = locations.sorted()
+
+  var ai = occurs.startIndex
+  let aend = occurs.endIndex
+  var ei = locations.startIndex
+  let eend = locations.endIndex
+
+  func compare(actual: SymbolOccurrence, expected: TestLoc) -> ComparisonResult {
+    let loc = TestLoc(actual.location)
+    if loc == expected { return .orderedSame }
+    if loc < expected { return .orderedAscending }
+    return .orderedDescending
+  }
+
+  while ai != aend && ei != eend {
+    XCTAssertEqual(occurs[ai].symbol.usr, usr, file: file, line: line)
+
+    switch compare(actual: occurs[ai], expected: locations[ei]) {
+    case .orderedSame:
+      occurs.formIndex(after: &ai)
+      locations.formIndex(after: &ei)
+    case .orderedAscending:
+      XCTFail("unexpected symbol occurrence \(occurs[ai])", file: file, line: line)
+      occurs.formIndex(after: &ai)
+    case .orderedDescending:
+      XCTFail("missing expected symbol occurrence at \(locations[ei])", file: file, line: line)
+      locations.formIndex(after: &ei)
+    }
+  }
+
+  while ai != aend {
+    XCTAssertEqual(occurs[ai].symbol.usr, usr, file: file, line: line)
+    XCTFail("unexpected symbol occurrence \(occurs[ai])", file: file, line: line)
+    occurs.formIndex(after: &ai)
+  }
+
+  while ei != eend {
+    XCTFail("missing expected symbol occurrence at \(locations[ei])", file: file, line: line)
+    locations.formIndex(after: &ei)
   }
 }

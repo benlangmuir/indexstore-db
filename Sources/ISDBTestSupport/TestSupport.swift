@@ -14,10 +14,35 @@ import IndexStoreDB
 import Foundation
 import XCTest
 
-public struct TestLoc {
+public struct TestLoc: Hashable {
   public var url: URL
   public var line: Int
   public var column: Int
+
+  public init(url: URL, line: Int, column: Int) {
+    self.url = url
+    self.line = line
+    self.column = column
+  }
+}
+
+extension TestLoc: Comparable {
+  public static func <(a: TestLoc, b: TestLoc) -> Bool {
+    return (a.url.path, a.line, a.column) < (b.url.path, b.line, b.column)
+  }
+}
+
+extension TestLoc {
+  public init(_ location: SymbolLocation) {
+    self.init(
+      url: URL(fileURLWithPath: location.path),
+      line: location.line,
+      column: location.utf8Column)
+  }
+}
+
+extension TestLoc: CustomStringConvertible {
+  public var description: String { "\(url.path):\(line):\(column)" }
 }
 
 public func isSourceFileExtension(_ ext: String) -> Bool {
