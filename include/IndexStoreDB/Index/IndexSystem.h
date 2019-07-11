@@ -134,6 +134,10 @@ public:
   bool foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<CanonicalFilePathRef> FilePaths,
       function_ref<bool(SymbolOccurrenceRef Occur)> Receiver);
 
+  bool foreachSymbolOccurrenceAtLocation(StringRef filePath, int line, int utf8Column,
+                                         SymbolRoleSet roleSet,
+                          function_ref<bool(SymbolOccurrenceRef)> receiver);
+
 private:
   IndexSystem(void *Impl) : Impl(Impl) {}
 

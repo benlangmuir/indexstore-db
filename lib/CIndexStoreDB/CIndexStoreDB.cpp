@@ -136,6 +136,21 @@ indexstoredb_index_related_symbol_occurrences_by_usr(
     });
 }
 
+bool
+indexstoredb_index_symbol_occurrences_at_location(
+    indexstoredb_index_t index,
+    const char *path,
+    int line,
+    int utf8Column,
+    uint64_t roles,
+    indexstoredb_symbol_occurrence_receiver_t receiver)
+{
+  auto obj = (IndexStoreDBObject<std::shared_ptr<IndexSystem>> *)index;
+  return obj->value->foreachSymbolOccurrenceAtLocation(StringRef(path), line, utf8Column, (SymbolRoleSet)roles, [&](SymbolOccurrenceRef occur) -> bool {
+    return receiver(make_object(occur));
+  });
+}
+
 const char *
 indexstoredb_symbol_usr(indexstoredb_symbol_t symbol) {
   auto obj = (IndexStoreDBObject<std::shared_ptr<Symbol>> *)symbol;

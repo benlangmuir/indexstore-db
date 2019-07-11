@@ -1,4 +1,5 @@
 {
+  "clang_flags": ["-Wno-objc-root-class"],
   "sources": [
     "a.swift",
     "b.swift",

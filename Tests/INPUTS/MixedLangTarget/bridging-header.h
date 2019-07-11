@@ -1,3 +1,3 @@
 #import "c.h"
 
-void bridgingHeader(void);
+void /*bridgingHeader:decl*/bridgingHeader(void);

@@ -1,3 +1,3 @@
-@interface C
--(void)method;
+@interface /*C:decl*/C
+-(void)/*C.method:decl*/method;
 @end

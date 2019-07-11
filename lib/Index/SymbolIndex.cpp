@@ -81,6 +81,10 @@ public:
   bool foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<CanonicalFilePathRef> FilePaths,
       function_ref<bool(SymbolOccurrenceRef Occur)> Receiver);
 
+  bool foreachSymbolOccurrenceAtLocation(
+      CanonicalFilePathRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+      function_ref<bool(SymbolOccurrenceRef)> receiver);
+
 private:
   bool foreachCanonicalSymbolImpl(bool workspaceOnly,
                                   function_ref<bool(ReadTransaction &, function_ref<bool(ArrayRef<IDCode> usrCode)> usrConsumer)> usrProducer,
@@ -506,6 +510,37 @@ bool SymbolIndexImpl::foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<Cano
   return true;
 }
 
+bool SymbolIndexImpl::foreachSymbolOccurrenceAtLocation(
+    CanonicalFilePathRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+    function_ref<bool(SymbolOccurrenceRef)> receiver) {
+  ReadTransaction reader(DBase);
+
+  SmallVector<IDCode, 16> seenProviders;
+  auto fileID = reader.getFilePathCode(filePath);
+  return reader.foreachUnitContainingFile(fileID, [&](ArrayRef<IDCode> unitCodes) {
+    for (auto unitCode : unitCodes) {
+      auto unit = reader.getUnitInfo(unitCode);
+      if (unit.isValid() && VisibilityChecker->isUnitVisible(unit, reader)) {
+        for (auto provider : unit.ProviderDepends) {
+          if (provider.FileCode == fileID && std::find(seenProviders.begin(), seenProviders.end(), provider.ProviderCode) == seenProviders.end()) {
+            seenProviders.push_back(provider.ProviderCode);
+            if (auto prov = createVisibleProviderForCode(provider.ProviderCode, reader)) {
+              prov->foreachSymbolOccurrenceInLineRange((unsigned)line, (unsigned)line+1, roleSet, [&](SymbolOccurrenceRef occur) {
+                // FIXME: what if the column is in the middle of the name?
+                if (occur->getLocation().getLine() == line && occur->getLocation().getColumn() == utf8Column) {
+                  receiver(occur);
+                }
+                return true;
+              });
+            }
+          }
+        }
+      }
+    }
+    return true;
+  });
+}
+
 //===----------------------------------------------------------------------===//
 // SymbolIndex
 //===----------------------------------------------------------------------===//
@@ -588,4 +623,10 @@ bool SymbolIndex::foreachCanonicalSymbolOccurrenceByKind(SymbolKind symKind, boo
 bool SymbolIndex::foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<CanonicalFilePathRef> FilePaths,
     function_ref<bool(SymbolOccurrenceRef Occur)> Receiver) {
   return IMPL->foreachUnitTestSymbolReferencedByOutputPaths(FilePaths, std::move(Receiver));
+}
+
+bool SymbolIndex::foreachSymbolOccurrenceAtLocation(
+    CanonicalFilePathRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+    function_ref<bool(SymbolOccurrenceRef)> receiver) {
+  return IMPL->foreachSymbolOccurrenceAtLocation(filePath, line, utf8Column, roleSet, std::move(receiver));
 }

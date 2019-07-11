@@ -64,6 +64,15 @@ public final class IndexStoreDB {
     indexstoredb_index_poll_for_unit_changes_and_wait(impl)
   }
 
+  public func occurrences(atPath path: String, line: Int, utf8Column: Int, roles: SymbolRole) -> [SymbolOccurrence] {
+    var result: [SymbolOccurrence] = []
+    indexstoredb_index_symbol_occurrences_at_location(impl, path, Int32(line), Int32(utf8Column), roles.rawValue) { (occur) -> Bool in
+      result.append(SymbolOccurrence(occur))
+      return true
+    }
+    return result
+  }
+
   @discardableResult
   public func forEachSymbolOccurrence(byUSR usr: String, roles: SymbolRole, _ body: @escaping (SymbolOccurrence) -> Bool) -> Bool {
     return indexstoredb_index_symbol_occurrences_by_usr(impl, usr, roles.rawValue) { occur in

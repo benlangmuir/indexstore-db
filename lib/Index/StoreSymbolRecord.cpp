@@ -402,3 +402,15 @@ bool StoreSymbolRecord::foreachUnitTestSymbolOccurrence(function_ref<bool(Symbol
 
   return !Err && Finished;
 }
+
+bool StoreSymbolRecord::foreachSymbolOccurrenceInLineRange(unsigned lineStart, unsigned lineEnd,
+    SymbolRoleSet roleSet, function_ref<bool(SymbolOccurrenceRef)> receiver) {
+  bool finished = true;
+  bool err = doForData([&](IndexRecordReader &reader) {
+    CheckIndexStoreRolesPredicate pred(roleSet);
+    PredOccurrenceConverter converter(*this, pred, receiver);
+    finished = reader.foreachOccurrenceInLineRange(lineStart, lineEnd, converter);
+  });
+
+  return !err && finished;
+}

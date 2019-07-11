@@ -153,6 +153,15 @@ indexstoredb_index_related_symbol_occurrences_by_usr(
     uint64_t roles,
     _Nonnull indexstoredb_symbol_occurrence_receiver_t);
 
+INDEXSTOREDB_PUBLIC bool
+indexstoredb_index_symbol_occurrences_at_location(
+    _Nonnull indexstoredb_index_t index,
+    const char *_Nonnull path,
+    int line,
+    int utf8Column,
+    uint64_t roles,
+    _Nonnull indexstoredb_symbol_occurrence_receiver_t);
+
 INDEXSTOREDB_PUBLIC
 const char * _Nonnull
 indexstoredb_symbol_usr(_Nonnull indexstoredb_symbol_t);

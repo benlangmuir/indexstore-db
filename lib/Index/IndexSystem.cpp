@@ -186,6 +186,10 @@ public:
 
   bool foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<CanonicalFilePathRef> FilePaths,
       function_ref<bool(SymbolOccurrenceRef Occur)> Receiver);
+
+  bool foreachSymbolOccurrenceAtLocation(
+      StringRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+      function_ref<bool(SymbolOccurrenceRef)> receiver);
 };
 
 } // anonymous namespace
@@ -536,6 +540,13 @@ bool IndexSystemImpl::foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<Cano
   return SymIndex->foreachUnitTestSymbolReferencedByOutputPaths(FilePaths, std::move(Receiver));
 }
 
+bool IndexSystemImpl::foreachSymbolOccurrenceAtLocation(
+    StringRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+    function_ref<bool(SymbolOccurrenceRef)> receiver) {
+  auto canonPath = PathIndex->getCanonicalPath(filePath);
+  return SymIndex->foreachSymbolOccurrenceAtLocation(canonPath, line, utf8Column, roleSet, std::move(receiver));
+}
+
 //===----------------------------------------------------------------------===//
 // IndexSystem
 //===----------------------------------------------------------------------===//
@@ -722,4 +733,10 @@ bool IndexSystem::foreachFileIncludedByFile(StringRef SourcePath,
 bool IndexSystem::foreachUnitTestSymbolReferencedByOutputPaths(ArrayRef<CanonicalFilePathRef> FilePaths,
     function_ref<bool(SymbolOccurrenceRef Occur)> Receiver) {
   return IMPL->foreachUnitTestSymbolReferencedByOutputPaths(FilePaths, std::move(Receiver));
+}
+
+bool IndexSystem::foreachSymbolOccurrenceAtLocation(
+    StringRef filePath, int line, int utf8Column, SymbolRoleSet roleSet,
+    function_ref<bool(SymbolOccurrenceRef)> receiver) {
+  return IMPL->foreachSymbolOccurrenceAtLocation(filePath, line, utf8Column, roleSet, std::move(receiver));
 }

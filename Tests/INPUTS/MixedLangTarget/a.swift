@@ -1,6 +1,4 @@
-func test(c: C) {
-  c.method()
-  bridgingHeader()
+func test(c: /*C:ref:swift*/C) {
+  c . /*C.method:call:swift*/method()
+  /*bridgingHeader:call*/bridgingHeader()
 }
-
-@_cdecl("fo") public func foo() { }
