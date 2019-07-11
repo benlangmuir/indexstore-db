@@ -247,7 +247,7 @@ extension XCTestCase {
         .appendingPathComponent("isdb-tests")
         .appendingPathComponent(testDirName),
       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("idsb-test-data")
+        .appendingPathComponent("isdb-test-data")
         .appendingPathComponent(testDirName))
   }
 
