@@ -23,21 +23,51 @@ public struct OutputFileMap {
     public var dependencies: String?
   }
 
-  public var value: [String: Entry] = [:]
+  var impl: [String: Entry] = [:]
+  var order: [String] = []
 
   public subscript(file: String) -> Entry? {
-    get { value[file] }
-    set { value[file] = newValue }
+    get { impl[file] }
+
+    set {
+      precondition(newValue != nil, "OutputFileMap does not support removal")
+      if impl.updateValue(newValue!, forKey: file) == nil {
+        // New entry.
+        order.append(file)
+      }
+    }
+  }
+
+  /// All of the entries, in the order they were added.
+  public var values: LazyMapSequence<[String], Entry> {
+    order.lazy.map { self.impl[$0]! }
   }
 }
 
 extension OutputFileMap: Codable {
 
+  private struct StringKey: CodingKey {
+    var stringValue: String
+
+    init(stringValue: String) {
+      self.stringValue = stringValue
+    }
+
+    var intValue: Int? { nil }
+    init?(intValue: Int) { return nil }
+  }
+
   public init(from decoder: Decoder) throws {
-    self.value = try [String: Entry].init(from: decoder)
+    let container = try decoder.container(keyedBy: StringKey.self)
+    for key in container.allKeys {
+      self[key.stringValue] = try container.decode(Entry.self, forKey: key)
+    }
   }
 
   public func encode(to encoder: Encoder) throws {
-    try value.encode(to: encoder)
+    var container = encoder.container(keyedBy: StringKey.self)
+    for file in order {
+      try container.encode(impl[file]!, forKey: StringKey(stringValue: file))
+    }
   }
 }

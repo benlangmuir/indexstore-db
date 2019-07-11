@@ -177,10 +177,6 @@ extension TibsBuilder {
     try ninja.write(to: buildRoot.appendingPathComponent("build.ninja"), atomically: false, encoding: .utf8)
 
     let encoder = JSONEncoder()
-    if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
-      encoder.outputFormatting = .sortedKeys // stable output
-    }
-
     let compdb = try encoder.encode(compilationDatabase)
     try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
     for target in targets {
@@ -278,7 +274,7 @@ extension TibsBuilder {
         BRIDGING_HEADER = \(module.bridgingHeader.map { "-import-objc-header \($0.path)" } ?? "")
         EMIT_HEADER = \(module.emitHeaderPath.map { "-emit-objc-header -emit-objc-header-path \($0)" } ?? "")
         EXTRA_ARGS = \(module.extraArgs.joined(separator: " "))
-        DEP_FILES = \(module.outputFileMap.value.values.compactMap { $0.dependencies }.joined(separator: " "))
+        DEP_FILES = \(module.outputFileMap.values.compactMap { $0.dependencies }.joined(separator: " "))
         OUTPUT_FILE_MAP = \(module.outputFileMapPath)
       """)
   }
