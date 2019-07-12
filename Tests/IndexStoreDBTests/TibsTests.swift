@@ -76,6 +76,18 @@ final class TibsTests: XCTestCase {
       ws.testLoc("bridgingHeader:decl"),
     ])
   }
+
+  func testSwiftModules() throws {
+    let ws = try staticTibsTestWorkspace(name: "SwiftModules")
+    try ws.buildAndIndex()
+
+    let occs = ws.index.occurrences(ofUSR: "s:1A3aaayyF", roles: [.definition, .declaration, .reference])
+    checkOccurrences(occs, usr: "s:1A3aaayyF", locations: [
+      ws.testLoc("aaa:def"),
+      ws.testLoc("aaa:call"),
+      ws.testLoc("aaa:call:c"),
+    ])
+  }
 }
 
 func checkOccurrences(
