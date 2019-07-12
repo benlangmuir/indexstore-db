@@ -38,6 +38,10 @@ let package = Package(
       name: "ISDBTibs",
       dependencies: []),
 
+    .testTarget(
+      name: "ISDBTibsTests",
+      dependencies: ["ISDBTibs"]),
+
     // Commandline tool for working with tibs projects.
     .target(
       name: "tibs",

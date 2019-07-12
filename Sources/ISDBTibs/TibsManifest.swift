@@ -37,19 +37,39 @@
 /// ```
 /// { "sources": ["main.swift"] }
 /// ```
-public struct TibsManifest {
+public struct TibsManifest: Equatable {
 
   /// Description of a target within a TibsManifest.
-  public struct Target {
+  public struct Target: Equatable {
     public var name: String? = nil
     public var swiftFlags: [String]? = nil
     public var clangFlags: [String]? = nil
     public var sources: [String]
     public var bridgingHeader: String? = nil
     public var dependencies: [String]? = nil
+
+    public init(
+      name: String? = nil,
+      swiftFlags: [String]? = nil,
+      clangFlags: [String]? = nil,
+      sources: [String],
+      bridgingHeader: String? = nil,
+      dependencies: [String]? = nil)
+    {
+      self.name = name
+      self.swiftFlags = swiftFlags
+      self.clangFlags = clangFlags
+      self.sources = sources
+      self.bridgingHeader = bridgingHeader
+      self.dependencies = dependencies
+    }
   }
 
   public var targets: [Target]
+
+  public init(targets: [Target] = []) {
+    self.targets = targets
+  }
 }
 
 extension TibsManifest.Target: Codable {
