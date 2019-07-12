@@ -21,10 +21,18 @@ public struct OutputFileMap {
     public var swiftmodule: String?
     public var swiftdoc: String?
     public var dependencies: String?
+
+    public init(swiftmodule: String? = nil, swiftdoc: String? = nil, dependencies: String? = nil) {
+      self.swiftmodule = swiftmodule
+      self.swiftdoc = swiftdoc
+      self.dependencies = dependencies
+    }
   }
 
   var impl: [String: Entry] = [:]
   var order: [String] = []
+
+  public init() {}
 
   public subscript(file: String) -> Entry? {
     get { impl[file] }
@@ -59,6 +67,7 @@ extension OutputFileMap: Codable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: StringKey.self)
+    // Note: allKeys is not in any guaranteed order, so we cannot round trip the order of entries.
     for key in container.allKeys {
       self[key.stringValue] = try container.decode(Entry.self, forKey: key)
     }
