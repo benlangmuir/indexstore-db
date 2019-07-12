@@ -19,7 +19,13 @@ extension Data {
   ///
   /// Checking if the contents have changed and writing the new contents are not done atomically,
   /// so there is no guarantee that there are no spurious writes if this API is used concurrently.
-  func writeIfChanged(to url: URL, options: Data.WritingOptions = []) throws {
+  ///
+  /// * parameters:
+  ///   * url: The location to write the data into.
+  ///   * options: Options for writing the data. Default value is [].
+  /// * returns: `true` if the data was written.
+  @discardableResult
+  public func writeIfChanged(to url: URL, options: Data.WritingOptions = []) throws -> Bool {
     let prev: Data?
     do {
       prev = try Data(contentsOf: url)
@@ -29,6 +35,9 @@ extension Data {
 
     if prev != self {
       try write(to: url, options: options)
+      return true
+    } else {
+      return false
     }
   }
 }
