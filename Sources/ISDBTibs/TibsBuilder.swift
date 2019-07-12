@@ -37,10 +37,10 @@ public final class TibsBuilder {
     for targetDesc in manifest.targets {
       let name = targetDesc.name ?? "main"
       let sources = targetDesc.sources.map {
-        URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: sourceRoot)
+        sourceRoot.appendingPathComponent($0, isDirectory: false)
       }
       let bridgingHeader = targetDesc.bridgingHeader.map {
-        URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: sourceRoot)
+        sourceRoot.appendingPathComponent($0, isDirectory: false)
       }
 
       let swiftFlags = targetDesc.swiftFlags ?? []

@@ -48,7 +48,7 @@ final class TibsTests: XCTestCase {
     XCTAssertEqual(module.moduleDeps, [])
     XCTAssertEqual(module.importPaths, [])
     XCTAssertEqual(module.extraArgs, [])
-    XCTAssertEqual(module.sources.map { $0.absoluteURL }, [
+    XCTAssertEqual(module.sources, [
       src.appendingPathComponent("a.swift", isDirectory: false),
       src.appendingPathComponent("b.swift", isDirectory: false),
       src.appendingPathComponent("rec/c.swift" , isDirectory: false),
@@ -76,12 +76,12 @@ final class TibsTests: XCTestCase {
     XCTAssertEqual(module.name, "main")
     XCTAssertEqual(module.emitModulePath, "main.swiftmodule")
     XCTAssertEqual(module.emitHeaderPath, "main-Swift.h")
-    XCTAssertEqual(module.bridgingHeader?.absoluteURL,
+    XCTAssertEqual(module.bridgingHeader,
                    src.appendingPathComponent("bridging-header.h", isDirectory: false))
     XCTAssertEqual(module.moduleDeps, [])
     XCTAssertEqual(module.importPaths, [])
     XCTAssertEqual(module.extraArgs, ["-Xcc", "-Wno-objc-root-class"])
-    XCTAssertEqual(module.sources.map { $0.absoluteURL }, [
+    XCTAssertEqual(module.sources, [
       src.appendingPathComponent("a.swift", isDirectory: false),
       src.appendingPathComponent("b.swift", isDirectory: false),
     ])
