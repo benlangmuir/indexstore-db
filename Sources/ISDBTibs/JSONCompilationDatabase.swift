@@ -51,11 +51,18 @@ public struct JSONCompilationDatabase: Equatable {
 
     /// The name of the build output, or nil.
     public var output: String? = nil
+
+    public init(directory: String, file: String, arguments: [String], output: String? = nil) {
+      self.directory = directory
+      self.file = file
+      self.arguments = arguments
+      self.output = output
+    }
   }
 
-  var commands: [Command] = []
+  public var commands: [Command] = []
 
-  init(commands: [Command] = []) {
+  public init(commands: [Command] = []) {
     self.commands = commands
   }
 }

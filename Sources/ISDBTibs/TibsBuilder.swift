@@ -143,6 +143,9 @@ extension TibsBuilder {
           "-output-file-map", module.outputFileMapPath,
           "-emit-module",
           "-emit-module-path", module.emitModulePath,
+          "-emit-dependencies",
+          "-pch-output-dir", "pch",
+          "-module-cache-path", "ModuleCache"
         ]
         args += module.emitHeaderPath.map { [
           "-emit-objc-header",
@@ -162,9 +165,28 @@ extension TibsBuilder {
         }
       }
 
-//      for tu in target.clangTUs {
-//        // TODO: implement.
-//      }
+      for tu in target.clangTUs {
+        var args = [
+          toolchain.clang.path,
+          "-fsyntax-only",
+          tu.source.path
+        ]
+        args += tu.importPaths.flatMap { ["-I", $0] }
+        args += [
+          "-index-store-path", "index",
+          "-index-ignore-system-symbols",
+          "-fmodules",
+          "-fmodules-cache-path=ModuleCache",
+          "-MMD", "-MF", "\(tu.outputPath).d",
+          "-o", tu.outputPath,
+        ]
+        args += tu.extraArgs
+
+        commands.append(JSONCompilationDatabase.Command(
+          directory: buildRoot.path,
+          file: tu.source.path,
+          arguments: args))
+      }
     }
 
     return JSONCompilationDatabase(commands: commands)
@@ -220,9 +242,9 @@ extension TibsBuilder {
         command = \(toolchain.swiftc.path) $in $IMPORT_PATHS -module-name $MODULE_NAME \
           -index-store-path index -index-ignore-system-modules \
           -output-file-map $OUTPUT_FILE_MAP \
-          -emit-module -emit-module-path $MODULE_PATH -emit-dependencies $EMIT_HEADER \
-          -pch-output-dir pch \
-          $BRIDGING_HEADER -module-cache-path ModuleCache $EXTRA_ARGS \
+          -emit-module -emit-module-path $MODULE_PATH -emit-dependencies \
+          -pch-output-dir pch -module-cache-path ModuleCache \
+          $EMIT_HEADER $BRIDGING_HEADER $EXTRA_ARGS \
           && \(toolchain.tibs.path) swift-deps-merge $out $DEP_FILES > $out.d
         depfile = $out.d
         deps = gcc

@@ -14,7 +14,7 @@ import ISDBTibs
 import Foundation
 import XCTest
 
-final class TibsTests: XCTestCase {
+final class TibsResolutionTests: XCTestCase {
 
   static let fakeToolchain: TibsToolchain = TibsToolchain(
     swiftc: URL(fileURLWithPath: "/swiftc"),
@@ -25,7 +25,7 @@ final class TibsTests: XCTestCase {
   func testResolutionSingleSwiftModule() throws {
     let dir = projectDir("proj1")
     let m = try manifest(projectDir: dir)
-    let tc = TibsTests.fakeToolchain
+    let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
     let builder = try TibsBuilder(manifest: m, sourceRoot: src, buildRoot: build, toolchain: tc)
@@ -58,7 +58,7 @@ final class TibsTests: XCTestCase {
   func testResolutionMixedLangTarget() throws {
     let dir = projectDir("MixedLangTarget")
     let m = try manifest(projectDir: dir)
-    let tc = TibsTests.fakeToolchain
+    let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
     let builder = try TibsBuilder(manifest: m, sourceRoot: src, buildRoot: build, toolchain: tc)
@@ -121,7 +121,7 @@ final class TibsTests: XCTestCase {
   func testResolutionSwiftModules() throws {
     let dir = projectDir("SwiftModules")
     let m = try manifest(projectDir: dir)
-    let tc = TibsTests.fakeToolchain
+    let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
     let builder = try TibsBuilder(manifest: m, sourceRoot: src, buildRoot: build, toolchain: tc)
@@ -192,16 +192,6 @@ final class TibsTests: XCTestCase {
       XCTAssertEqual(target.clangTUs, [])
     }
   }
-
-  // Compilation Database tests
-
-  // Build
-  //
-  // Null and non-null rebuild
-  // * Header change
-  // * Source file change
-  // * OFM change
-  // * Ninja changes
 }
 
 func projectDir(_ name: String) -> URL {
