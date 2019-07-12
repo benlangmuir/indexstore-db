@@ -20,7 +20,7 @@ final class MiscTests: XCTestCase {
     let data2 = "2\n".data(using: .utf8)!
 
     let url = URL(fileURLWithPath: NSTemporaryDirectory())
-      .appendingPathComponent("ISDBTibsTests.MiscTests.testDataWriteIfChanged.txt")
+      .appendingPathComponent("\(MiscTests.self).\(#function).txt", isDirectory: false)
 
     _ = try? FileManager.default.removeItem(at: url)
     XCTAssertTrue(try data1.writeIfChanged(to: url))

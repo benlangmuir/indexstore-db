@@ -131,15 +131,14 @@ final class LocationScannerTests: XCTestCase {
     let proj1 = URL(fileURLWithPath: #file)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("INPUTS")
-      .appendingPathComponent("proj1")
+      .appendingPathComponent("INPUTS/proj1", isDirectory: true)
     XCTAssertEqual(try scanDir(proj1), [
-      Loc(url: proj1.appendingPathComponent("a.swift"), "a:def", 1, 15),
-      Loc(url: proj1.appendingPathComponent("a.swift"), "b:call", 2, 13),
-      Loc(url: proj1.appendingPathComponent("a.swift"), "c:call", 3, 13),
-      Loc(url: proj1.appendingPathComponent("b.swift"), "b:def", 1, 15),
-      Loc(url: proj1.appendingPathComponent("b.swift"), "a:call", 2, 13),
-      Loc(url: proj1.appendingPathComponent("rec").appendingPathComponent("c.swift"), "c", 1, 11),
+      Loc(url: proj1.appendingPathComponent("a.swift", isDirectory: false), "a:def", 1, 15),
+      Loc(url: proj1.appendingPathComponent("a.swift", isDirectory: false), "b:call", 2, 13),
+      Loc(url: proj1.appendingPathComponent("a.swift", isDirectory: false), "c:call", 3, 13),
+      Loc(url: proj1.appendingPathComponent("b.swift", isDirectory: false), "b:def", 1, 15),
+      Loc(url: proj1.appendingPathComponent("b.swift", isDirectory: false), "a:call", 2, 13),
+      Loc(url: proj1.appendingPathComponent("rec/c.swift", isDirectory: false), "c", 1, 11),
     ])
   }
 }

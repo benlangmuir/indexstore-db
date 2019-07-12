@@ -49,9 +49,9 @@ final class TibsTests: XCTestCase {
     XCTAssertEqual(module.importPaths, [])
     XCTAssertEqual(module.extraArgs, [])
     XCTAssertEqual(module.sources.map { $0.absoluteURL }, [
-      src.appendingPathComponent("a.swift"),
-      src.appendingPathComponent("b.swift"),
-      src.appendingPathComponent("rec").appendingPathComponent("c.swift"),
+      src.appendingPathComponent("a.swift", isDirectory: false),
+      src.appendingPathComponent("b.swift", isDirectory: false),
+      src.appendingPathComponent("rec/c.swift" , isDirectory: false),
     ])
   }
 
@@ -77,13 +77,13 @@ final class TibsTests: XCTestCase {
     XCTAssertEqual(module.emitModulePath, "main.swiftmodule")
     XCTAssertEqual(module.emitHeaderPath, "main-Swift.h")
     XCTAssertEqual(module.bridgingHeader?.absoluteURL,
-                   src.appendingPathComponent("bridging-header.h"))
+                   src.appendingPathComponent("bridging-header.h", isDirectory: false))
     XCTAssertEqual(module.moduleDeps, [])
     XCTAssertEqual(module.importPaths, [])
     XCTAssertEqual(module.extraArgs, ["-Xcc", "-Wno-objc-root-class"])
     XCTAssertEqual(module.sources.map { $0.absoluteURL }, [
-      src.appendingPathComponent("a.swift"),
-      src.appendingPathComponent("b.swift"),
+      src.appendingPathComponent("a.swift", isDirectory: false),
+      src.appendingPathComponent("b.swift", isDirectory: false),
     ])
 
     // TODO: clangTUs
@@ -104,11 +104,11 @@ func projectDir(_ name: String) -> URL {
   return URL(fileURLWithPath: #file)
     .deletingLastPathComponent()
     .deletingLastPathComponent()
-    .appendingPathComponent("INPUTS")
-    .appendingPathComponent(name)
+    .appendingPathComponent("INPUTS/\(name)", isDirectory: true)
 }
 
 func manifest(projectDir: URL) throws -> TibsManifest {
-  let manifestData = try Data(contentsOf: projectDir.appendingPathComponent("project.json"))
+  let manifestData = try Data(
+    contentsOf: projectDir.appendingPathComponent("project.json", isDirectory: false))
   return try JSONDecoder().decode(TibsManifest.self, from:  manifestData)
 }

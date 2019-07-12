@@ -69,7 +69,7 @@ func main(arguments: [String]) {
   }
 
   let projectDir = URL(fileURLWithPath: arguments.last!, isDirectory: true)
-  let manifestURL = projectDir.appendingPathComponent("project.json")
+  let manifestURL = projectDir.appendingPathComponent("project.json", isDirectory: false)
 
   let manifest: TibsManifest
   do {
@@ -85,7 +85,7 @@ func main(arguments: [String]) {
   let toolchain = TibsToolchain(
     swiftc: URL(fileURLWithPath: "/usr/bin/swiftc"),
     clang: URL(fileURLWithPath: "/usr/bin/clang"),
-    tibs: Bundle.main.bundleURL.appendingPathComponent("tibs"))
+    tibs: Bundle.main.bundleURL.appendingPathComponent("tibs", isDirectory: false))
 
   let builder: TibsBuilder
   do {

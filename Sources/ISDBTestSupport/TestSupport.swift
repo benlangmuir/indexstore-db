@@ -184,7 +184,7 @@ public final class StaticTibsTestWorkspace {
   public static let defaultToolchain = TibsToolchain(
     swiftc: findTool(name: "swiftc")!,
     clang: findTool(name: "clang")!,
-    tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs"),
+    tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
     ninja: findTool(name: "ninja"))
 
   public var sources: TestSources
@@ -198,7 +198,7 @@ public final class StaticTibsTestWorkspace {
     let fm = FileManager.default
     try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
 
-    let manifestURL = projectDir.appendingPathComponent("project.json")
+    let manifestURL = projectDir.appendingPathComponent("project.json", isDirectory: false)
     let manifest = try JSONDecoder().decode(TibsManifest.self, from: try Data(contentsOf: manifestURL))
     builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: buildDir, toolchain: toolchain)
 
@@ -208,8 +208,7 @@ public final class StaticTibsTestWorkspace {
     let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.swiftc
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("lib")
-      .appendingPathComponent("libIndexStore.dylib")
+      .appendingPathComponent("lib/libIndexStore.dylib", isDirectory: false)
       .path) // FIXME: non-Mac
 
     self.tmpDir = tmpDir
@@ -243,13 +242,12 @@ extension XCTestCase {
   public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace {
     let testDirName = testDirectoryName
     return try StaticTibsTestWorkspace(
-      projectDir: inputsDirectory(testFile: testFile).appendingPathComponent(name),
+      projectDir: inputsDirectory(testFile: testFile)
+        .appendingPathComponent(name, isDirectory: true),
       buildDir: XCTestCase.productsDirectory
-        .appendingPathComponent("isdb-tests")
-        .appendingPathComponent(testDirName),
+        .appendingPathComponent("isdb-tests/\(testDirName)", isDirectory: true),
       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("isdb-test-data")
-        .appendingPathComponent(testDirName))
+        .appendingPathComponent("isdb-test-data/\(testDirName)", isDirectory: true))
   }
 
   /// The path the the test INPUTS directory.
@@ -257,7 +255,7 @@ extension XCTestCase {
     return URL(fileURLWithPath: testFile)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("INPUTS")
+      .appendingPathComponent("INPUTS", isDirectory: true)
   }
 
   /// The path to the built products directory.

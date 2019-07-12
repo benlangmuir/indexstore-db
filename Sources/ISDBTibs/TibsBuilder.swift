@@ -21,7 +21,7 @@ public final class TibsBuilder {
   public private(set) var toolchain: TibsToolchain
   public private(set) var buildRoot: URL
 
-  public var indexstore: URL { buildRoot.appendingPathComponent("index") }
+  public var indexstore: URL { buildRoot.appendingPathComponent("index", isDirectory: true) }
 
   public enum Error: Swift.Error {
     case duplicateTarget(String)
@@ -171,15 +171,20 @@ extension TibsBuilder {
   }
 
   public func writeBuildFiles() throws {
-    try ninja.write(to: buildRoot.appendingPathComponent("build.ninja"), atomically: false, encoding: .utf8)
+    try ninja.write(
+      to: buildRoot.appendingPathComponent("build.ninja", isDirectory: false),
+      atomically: false,
+      encoding: .utf8)
 
     let encoder = JSONEncoder()
     let compdb = try encoder.encode(compilationDatabase)
-    try compdb.write(to: buildRoot.appendingPathComponent("compile_commands.json"))
+    try compdb.write(
+      to: buildRoot.appendingPathComponent("compile_commands.json", isDirectory: false))
     for target in targets {
       if let module = target.swiftModule {
         let ofm = try encoder.encode(module.outputFileMap)
-        try ofm.writeIfChanged(to: buildRoot.appendingPathComponent(module.outputFileMapPath))
+        try ofm.writeIfChanged(
+          to: buildRoot.appendingPathComponent(module.outputFileMapPath, isDirectory: false))
       }
     }
   }
