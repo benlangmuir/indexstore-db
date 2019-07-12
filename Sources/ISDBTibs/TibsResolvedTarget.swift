@@ -20,22 +20,7 @@ import struct Foundation.URL
 /// target without additional information.
 public final class TibsResolvedTarget {
 
-  public var name: String
-  public var compileUnits: [TibsCompileUnit]
-  public var dependencies: [String]
-
-  public init(name: String, compileUnits: [TibsCompileUnit], dependencies: [String]) {
-    self.name = name
-    self.compileUnits = compileUnits
-    self.dependencies = dependencies
-  }
-}
-
-public enum TibsCompileUnit {
-  case swiftModule(SwiftModule)
-  case clangTranslationUnit(ClangTU)
-
-  public struct SwiftModule {
+  public struct SwiftModule: Equatable {
     public var name: String
     public var extraArgs: [String]
     public var sources: [URL]
@@ -46,13 +31,69 @@ public enum TibsCompileUnit {
     public var bridgingHeader: URL?
     public var moduleDeps: [String]
     public var importPaths: [String] { moduleDeps.isEmpty ? [] : ["."] }
+
+    public init(
+      name: String,
+      extraArgs: [String] = [],
+      sources: [URL] = [],
+      emitModulePath: String,
+      emitHeaderPath: String? = nil,
+      outputFileMap: OutputFileMap,
+      bridgingHeader: URL? = nil,
+      moduleDeps: [String] = [])
+    {
+      self.name = name
+      self.extraArgs = extraArgs
+      self.sources = sources
+      self.emitModulePath = emitModulePath
+      self.emitHeaderPath = emitHeaderPath
+      self.outputFileMap = outputFileMap
+      self.bridgingHeader = bridgingHeader
+      self.moduleDeps = moduleDeps
+    }
   }
 
-  public struct ClangTU {
+  public struct ClangTU: Equatable {
     public var extraArgs: [String]
     public var source: URL
     public var importPaths: [String]
     public var generatedHeaderDep: String?
     public var outputPath: String
+
+    public init(
+      extraArgs: [String] = [],
+      source: URL,
+      importPaths: [String] = [],
+      generatedHeaderDep: String? = nil,
+      outputPath: String)
+    {
+      self.extraArgs = extraArgs
+      self.source = source
+      self.importPaths = importPaths
+      self.generatedHeaderDep = generatedHeaderDep
+      self.outputPath = outputPath
+    }
+  }
+
+  public var name: String
+  public var swiftModule: SwiftModule?
+  public var clangTUs: [ClangTU]
+  public var dependencies: [String]
+
+  public init(name: String, swiftModule: SwiftModule?, clangTUs: [ClangTU], dependencies: [String]) {
+    self.name = name
+    self.swiftModule = swiftModule
+    self.clangTUs = clangTUs
+    self.dependencies = dependencies
+  }
+}
+
+extension TibsResolvedTarget: Equatable {
+  public static func ==(a: TibsResolvedTarget, b: TibsResolvedTarget) -> Bool {
+    if a === b {
+      return true
+    }
+    return (a.name, a.swiftModule, a.clangTUs, a.dependencies)
+      == (b.name, b.swiftModule, b.clangTUs, b.dependencies)
   }
 }

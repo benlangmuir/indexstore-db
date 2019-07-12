@@ -80,3 +80,9 @@ extension OutputFileMap: Codable {
     }
   }
 }
+
+extension OutputFileMap: Equatable {
+  public static func ==(a: OutputFileMap, b: OutputFileMap) -> Bool {
+    return a.order == b.order && a.values.elementsEqual(b.values)
+  }
+}
