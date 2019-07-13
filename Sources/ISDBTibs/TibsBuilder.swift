@@ -112,12 +112,42 @@ extension TibsBuilder {
   // MARK: Building
 
   public func build() throws {
+    try buildImpl()
+  }
 
+  /// *For Testing* Build and collect a list of commands that were (re)built.
+  public func _buildTest() throws -> Set<String> {
+    let pipe = Pipe()
+
+    try buildImpl { process in
+      process.standardOutput = pipe
+    }
+
+    let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+    var rest = out.startIndex..<out.endIndex
+
+    var result = Set<String>()
+    while let range = out.range(of: "] Indexing ", range: rest) {
+      let srcEnd = out[range.upperBound...].index(of: "\n") ?? rest.upperBound
+      result.insert(String(out[range.upperBound ..< srcEnd]))
+      rest = srcEnd..<rest.upperBound
+    }
+
+    return result
+  }
+
+  func buildImpl(processCustomization: (Process) -> () = { _ in }) throws {
     guard let ninja = toolchain.ninja?.path else {
       throw Error.noNinjaBinaryConfigured
     }
 
-    let p = Process.launchedProcess(launchPath: ninja, arguments: ["-C", buildRoot.path])
+    let p = Process()
+    p.launchPath = ninja
+    p.arguments = ["-C", buildRoot.path]
+
+    processCustomization(p)
+
+    p.launch()
     p.waitUntilExit()
     if p.terminationReason != .exit || p.terminationStatus != 0 {
       throw Error.buildFailure(p.terminationReason, exitCode: p.terminationStatus)

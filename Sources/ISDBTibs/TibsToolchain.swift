@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import struct Foundation.URL
+import Foundation
 
 /// The set of commandline tools used to build a tibs project.
 public struct TibsToolchain {
@@ -25,4 +25,34 @@ public struct TibsToolchain {
     self.tibs = tibs
     self.ninja = ninja
   }
+}
+
+/// Returns the path to the given tool, as found by `xcrun --find` on macOS, or `which` on Linux.
+public func findTool(name: String) -> URL? {
+  let p = Process()
+#if os(macOS)
+  p.launchPath = "/usr/bin/xcrun"
+  p.arguments = ["--find", name]
+#else
+  p.launchPath = "/usr/bin/which"
+  p.arguments = [name]
+#endif
+  let out = Pipe()
+  p.standardOutput = out
+
+  p.launch()
+  p.waitUntilExit()
+
+  if p.terminationReason != .exit || p.terminationStatus != 0 {
+    return nil
+  }
+
+  let data = out.fileHandleForReading.readDataToEndOfFile()
+  guard var path = String(data: data, encoding: .utf8) else {
+    return nil
+  }
+  if path.last == "\n" {
+    path = String(path.dropLast())
+  }
+  return URL(fileURLWithPath: path)
 }
