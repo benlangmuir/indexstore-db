@@ -119,8 +119,14 @@ extension TibsBuilder {
   public func _buildTest() throws -> Set<String> {
     let pipe = Pipe()
 
-    try buildImpl { process in
-      process.standardOutput = pipe
+    do {
+      try buildImpl { process in
+        process.standardOutput = pipe
+      }
+    } catch {
+      let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+      print(out)
+      throw error
     }
 
     let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!

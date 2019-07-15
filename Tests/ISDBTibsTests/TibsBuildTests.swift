@@ -115,6 +115,56 @@ final class TibsBuildTests: XCTestCase {
     sleepForTimestamp()
     XCTAssertEqual(try builder._buildTest(), ["Swift Module main"])
   }
+
+  func testBuildSwiftModules() throws {
+    let builder = try copyAndLoad(project: "SwiftModules")
+    try builder.writeBuildFiles()
+    XCTAssertEqual(try builder._buildTest(), ["Swift Module A", "Swift Module B", "Swift Module C"])
+    XCTAssertEqual(try builder._buildTest(), [])
+
+    let bswift = sourceRoot.appendingPathComponent("b.swift", isDirectory: false)
+    try "public func bbb() -> Int { 0 }".write(to: bswift, atomically: false, encoding: .utf8)
+    sleepForTimestamp()
+    XCTAssertEqual(try builder._buildTest(), ["Swift Module B", "Swift Module C"])
+
+    let cswift = sourceRoot.appendingPathComponent("c.swift", isDirectory: false)
+    try "import B\nfunc test() { let _: Int = bbb() }".write(to: cswift, atomically: false, encoding: .utf8)
+    sleepForTimestamp()
+    XCTAssertEqual(try builder._buildTest(), ["Swift Module C"])
+    XCTAssertEqual(try builder._buildTest(), [])
+  }
+
+  func testBuildMixedLang() throws {
+    let builder = try copyAndLoad(project: "MixedLangTarget")
+    try builder.writeBuildFiles()
+
+    let bc = sourceRoot.appendingPathComponent("b.c", isDirectory: false)
+    let cm = sourceRoot.appendingPathComponent("c.m", isDirectory: false)
+    let dcpp = sourceRoot.appendingPathComponent("d.cpp", isDirectory: false)
+    let emm = sourceRoot.appendingPathComponent("e.mm", isDirectory: false)
+
+    XCTAssertEqual(try builder._buildTest(),
+      ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
+    XCTAssertEqual(try builder._buildTest(), [])
+
+    let ch = sourceRoot.appendingPathComponent("c.h", isDirectory: false)
+    try """
+      @interface C
+      -(void)method;
+      @end
+      """.write(to: ch, atomically: false, encoding: .utf8)
+    sleepForTimestamp()
+    // FIXME: there is a false dependency because of the generated header main-Swift.h
+    XCTAssertEqual(try builder._buildTest(),
+      ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
+
+    let dh = sourceRoot.appendingPathComponent("d.h", isDirectory: false)
+    try """
+      class D {};
+      """.write(to: dh, atomically: false, encoding: .utf8)
+    sleepForTimestamp()
+    XCTAssertEqual(try builder._buildTest(), [dcpp.path, emm.path])
+  }
 }
 
 extension XCTestCase {
