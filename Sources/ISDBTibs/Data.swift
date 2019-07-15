@@ -31,6 +31,8 @@ extension Data {
       prev = try Data(contentsOf: url)
     } catch CocoaError.fileReadNoSuchFile {
       prev = nil
+    } catch let error as NSError where error.code == POSIXError.ENOENT.rawValue {
+      prev = nil
     }
 
     if prev != self {
