@@ -52,11 +52,19 @@ final class TibsBuildTests: XCTestCase {
     // FIXME: this method is very incomplete. If we're running on a filesystem that doesn't support
     // high resolution time stamps, we'll need to detect that here. This should only be done for
     // testing.
-    var usec: UInt32 = 1
+    var usec: UInt32 = 0
+    var reason: String = ""
     if TibsBuildTests.ninjaVersion < (1, 9, 0) {
       usec = 1_000_000
+      reason = "upgrade to ninja >= 1.9.0 for high precision timestamp support"
     }
-    usleep(usec)
+
+    if usec > 0 {
+      let fsec = Float(usec) / 1_000_000
+      fputs("warning: waiting \(fsec) second\(fsec == 1.0 ? "" : "s") to ensure file timestamp " +
+            "differs; \(reason)\n", stderr)
+      usleep(usec)
+    }
   }
 
   var fm: FileManager = FileManager.default
