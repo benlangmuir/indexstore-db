@@ -235,6 +235,10 @@ extension TibsBuilder {
       encoding: .utf8)
 
     let encoder = JSONEncoder()
+    if #available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
+      encoder.outputFormatting = .sortedKeys
+    }
+
     let compdb = try encoder.encode(compilationDatabase)
     try compdb.write(
       to: buildRoot.appendingPathComponent("compile_commands.json", isDirectory: false))

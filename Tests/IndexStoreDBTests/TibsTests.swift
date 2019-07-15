@@ -55,6 +55,13 @@ final class TibsTests: XCTestCase {
       ws.testLoc("C:ref:e.mm"),
     ])
 
+    let cFuncDeclOccs = index.occurrences(ofUSR: "c:@F@cFunc", roles: [.definition, .declaration, .reference])
+    checkOccurrences(cFuncDeclOccs, usr: "c:@F@cFunc", locations: [
+      ws.testLoc("cFunc:decl"),
+      ws.testLoc("cFunc:def"),
+      ws.testLoc("cFunc:call"),
+    ])
+
     let cmethodOccs = index.occurrences(ofUSR: "c:objc(cs)C(im)method", roles: [.definition, .declaration, .reference])
     checkOccurrences(cmethodOccs, usr: "c:objc(cs)C(im)method", locations: [
       ws.testLoc("C.method:call:swift"),

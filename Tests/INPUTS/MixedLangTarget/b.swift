@@ -1,1 +1,3 @@
-@_cdecl("foo") public func /*foo:def*/foo(_: Int) { }
+@_cdecl("foo") public func /*foo:def*/foo(_: Int) {
+  /*cFunc:call*/cFunc()
+}

@@ -36,17 +36,4 @@ final class OutputFileMapTests: XCTestCase {
       OutputFileMap.Entry(swiftmodule: "C"),
     ])
   }
-
-  func testStableSerialization() throws {
-    var ofm = OutputFileMap()
-    ofm["c"] = OutputFileMap.Entry(swiftdoc: "C")
-    ofm["a"] = OutputFileMap.Entry(swiftdoc: "A")
-    ofm["b"] = OutputFileMap.Entry(swiftdoc: "B")
-
-    let encoder = JSONEncoder()
-
-    XCTAssertEqual(String(data: try encoder.encode(ofm), encoding: .utf8), """
-      {"c":{"swiftdoc":"C"},"a":{"swiftdoc":"A"},"b":{"swiftdoc":"B"}}
-      """)
-  }
 }

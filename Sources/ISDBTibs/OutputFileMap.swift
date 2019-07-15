@@ -75,6 +75,7 @@ extension OutputFileMap: Codable {
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: StringKey.self)
+    // Note: the underlying encoder may not preserve the order of values.
     for file in order {
       try container.encode(impl[file]!, forKey: StringKey(stringValue: file))
     }

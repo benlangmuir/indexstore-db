@@ -16,7 +16,6 @@ extension OutputFileMapTests {
     // to regenerate.
     static let __allTests__OutputFileMapTests = [
         ("testInsertOrder", testInsertOrder),
-        ("testStableSerialization", testStableSerialization),
     ]
 }
 

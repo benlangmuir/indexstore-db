@@ -107,12 +107,12 @@ final class TibsBuildTests: XCTestCase {
     try fm.moveItem(at: aswift, to: aswift2)
     XCTAssertThrowsError(try builder._buildTest())
 
-    try fm.moveItem(at: aswift2, to: aswift)
     sleepForTimestamp()
+    try fm.moveItem(at: aswift2, to: aswift)
     XCTAssertEqual(try builder._buildTest(), [])
 
-    try "func a() -> Int { 0 }".write(to: aswift, atomically: false, encoding: .utf8)
     sleepForTimestamp()
+    try "func a() -> Int { 0 }".write(to: aswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module main"])
   }
 
@@ -123,13 +123,13 @@ final class TibsBuildTests: XCTestCase {
     XCTAssertEqual(try builder._buildTest(), [])
 
     let bswift = sourceRoot.appendingPathComponent("b.swift", isDirectory: false)
-    try "public func bbb() -> Int { 0 }".write(to: bswift, atomically: false, encoding: .utf8)
     sleepForTimestamp()
+    try "public func bbb() -> Int { 0 }".write(to: bswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module B", "Swift Module C"])
 
     let cswift = sourceRoot.appendingPathComponent("c.swift", isDirectory: false)
-    try "import B\nfunc test() { let _: Int = bbb() }".write(to: cswift, atomically: false, encoding: .utf8)
     sleepForTimestamp()
+    try "import B\nfunc test() { let _: Int = bbb() }".write(to: cswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module C"])
     XCTAssertEqual(try builder._buildTest(), [])
   }
@@ -148,21 +148,21 @@ final class TibsBuildTests: XCTestCase {
     XCTAssertEqual(try builder._buildTest(), [])
 
     let ch = sourceRoot.appendingPathComponent("c.h", isDirectory: false)
-    try """
-      @interface C
-      -(void)method;
-      @end
-      """.write(to: ch, atomically: false, encoding: .utf8)
+
+    // touch
+    var content = try Data(contentsOf: ch)
+    content.append(" ".utf8.first!)
     sleepForTimestamp()
+    try content.write(to: ch)
     // FIXME: there is a false dependency because of the generated header main-Swift.h
     XCTAssertEqual(try builder._buildTest(),
       ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
 
+    sleepForTimestamp()
     let dh = sourceRoot.appendingPathComponent("d.h", isDirectory: false)
     try """
       class D {};
       """.write(to: dh, atomically: false, encoding: .utf8)
-    sleepForTimestamp()
     XCTAssertEqual(try builder._buildTest(), [dcpp.path, emm.path])
   }
 }
