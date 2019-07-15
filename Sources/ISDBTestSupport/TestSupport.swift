@@ -208,7 +208,7 @@ public final class StaticTibsTestWorkspace {
     let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.swiftc
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("lib/libIndexStore.dylib", isDirectory: false)
+      .appendingPathComponent("lib/libIndexStore.\(dylibExt)", isDirectory: false)
       .path) // FIXME: non-Mac
 
     self.tmpDir = tmpDir
@@ -223,6 +223,12 @@ public final class StaticTibsTestWorkspace {
     _ = try? FileManager.default.removeItem(atPath: tmpDir.path)
   }
 }
+
+#if os(macOS)
+public let dylibExt = "dylib"
+#else
+public let dylibExt = "so"
+#endif
 
 extension StaticTibsTestWorkspace {
 

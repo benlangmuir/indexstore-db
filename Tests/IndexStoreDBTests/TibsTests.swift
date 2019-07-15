@@ -47,19 +47,13 @@ final class TibsTests: XCTestCase {
     try ws.buildAndIndex()
     let index = ws.index
 
+  #if os(macOS)
     let cdeclOccs = index.occurrences(ofUSR: "c:objc(cs)C", roles: [.definition, .declaration, .reference])
     checkOccurrences(cdeclOccs, usr: "c:objc(cs)C", locations: [
       ws.testLoc("C:decl"),
       ws.testLoc("C:def"),
       ws.testLoc("C:ref:swift"),
       ws.testLoc("C:ref:e.mm"),
-    ])
-
-    let cFuncDeclOccs = index.occurrences(ofUSR: "c:@F@cFunc", roles: [.definition, .declaration, .reference])
-    checkOccurrences(cFuncDeclOccs, usr: "c:@F@cFunc", locations: [
-      ws.testLoc("cFunc:decl"),
-      ws.testLoc("cFunc:def"),
-      ws.testLoc("cFunc:call"),
     ])
 
     let cmethodOccs = index.occurrences(ofUSR: "c:objc(cs)C(im)method", roles: [.definition, .declaration, .reference])
@@ -69,6 +63,7 @@ final class TibsTests: XCTestCase {
       ws.testLoc("C.method:def"),
       ws.testLoc("C.method:call:e.mm"),
     ])
+  #endif
 
     let dOccs = index.occurrences(ofUSR: "c:@S@D", roles: [.definition, .declaration, .reference])
     checkOccurrences(dOccs, usr: "c:@S@D", locations: [
