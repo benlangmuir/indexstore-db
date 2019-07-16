@@ -192,7 +192,7 @@ public final class StaticTibsTestWorkspace {
   public var index: IndexStoreDB
   public let tmpDir: URL
 
-  public init(projectDir: URL, buildDir: URL, tmpDir: URL, toolchain: TibsToolchain = StaticTibsTestWorkspace.defaultToolchain) throws {
+  public init(projectDir: URL, buildDir: URL, tmpDir: URL, toolchain: TibsToolchain) throws {
     sources = try TestSources(rootDirectory: projectDir)
 
     let fm = FileManager.default
@@ -243,38 +243,31 @@ extension StaticTibsTestWorkspace {
   public func testLoc(_ name: String) -> TestLoc { sources.locations[name]! }
 }
 
-extension StaticTibsTestWorkspace {
-  public static let clangVersionOutput: String = {
-    let p = Process()
-    p.launchPath = StaticTibsTestWorkspace.defaultToolchain.clang.path
-    p.arguments = ["--version"]
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.launch()
-    p.waitUntilExit()
-    guard p.terminationReason == .exit && p.terminationStatus == 0 else {
-      fatalError("could not get clang --version")
-    }
-
-    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
-  }()
-
-  public static let clangHasIndexSupport: Bool = {
-    clangVersionOutput.starts(with: "Apple") || clangVersionOutput.contains("swift-clang")
-  }()
-}
-
 extension XCTestCase {
 
-  public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace {
+  /// Returns nil and prints a warning if toolchain does not support this test.
+  public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace? {
     let testDirName = testDirectoryName
-    return try StaticTibsTestWorkspace(
+
+    let toolchain = StaticTibsTestWorkspace.defaultToolchain
+
+    let workspace = try StaticTibsTestWorkspace(
       projectDir: inputsDirectory(testFile: testFile)
         .appendingPathComponent(name, isDirectory: true),
       buildDir: XCTestCase.productsDirectory
         .appendingPathComponent("isdb-tests/\(testDirName)", isDirectory: true),
       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("isdb-test-data/\(testDirName)", isDirectory: true))
+        .appendingPathComponent("isdb-test-data/\(testDirName)", isDirectory: true),
+      toolchain: toolchain)
+
+    if workspace.builder.targets.contains(where: { target in !target.clangTUs.isEmpty })
+      && !toolchain.clangHasIndexSupport {
+      fputs("warning: skipping test because '\(toolchain.clang.path)' does not have indexstore " +
+            "support; use swift-clang\n", stderr)
+      return nil
+    }
+
+    return workspace
   }
 
   /// The path the the test INPUTS directory.

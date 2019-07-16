@@ -17,7 +17,7 @@ import XCTest
 final class TibsTests: XCTestCase {
 
   func testBasic() throws {
-    let ws = try staticTibsTestWorkspace(name: "proj1")
+    guard let ws = try staticTibsTestWorkspace(name: "proj1") else { return }
     let index = ws.index
 
     let getOccs = { index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition]) }
@@ -43,11 +43,7 @@ final class TibsTests: XCTestCase {
   }
 
   func testMixedLangTarget() throws {
-    guard StaticTibsTestWorkspace.clangHasIndexSupport else {
-      fputs("warning: skipping test \(#function) because clang does not have indexstore support; use swift-clang", stderr)
-      return
-    }
-    let ws = try staticTibsTestWorkspace(name: "MixedLangTarget")
+    guard let ws = try staticTibsTestWorkspace(name: "MixedLangTarget") else { return }
     try ws.buildAndIndex()
     let index = ws.index
 
@@ -84,7 +80,7 @@ final class TibsTests: XCTestCase {
   }
 
   func testSwiftModules() throws {
-    let ws = try staticTibsTestWorkspace(name: "SwiftModules")
+    guard let ws = try staticTibsTestWorkspace(name: "SwiftModules") else { return }
     try ws.buildAndIndex()
 
     let occs = ws.index.occurrences(ofUSR: "s:1A3aaayyF", roles: [.definition, .declaration, .reference])

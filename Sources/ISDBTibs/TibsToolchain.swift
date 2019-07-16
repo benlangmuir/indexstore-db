@@ -13,11 +13,11 @@
 import Foundation
 
 /// The set of commandline tools used to build a tibs project.
-public struct TibsToolchain {
-  public var swiftc: URL
-  public var clang: URL
-  public var tibs: URL
-  public var ninja: URL? = nil
+public final class TibsToolchain {
+  public let swiftc: URL
+  public let clang: URL
+  public let tibs: URL
+  public let ninja: URL?
 
   public init(swiftc: URL, clang: URL, tibs: URL, ninja: URL? = nil) {
     self.swiftc = swiftc
@@ -25,6 +25,24 @@ public struct TibsToolchain {
     self.tibs = tibs
     self.ninja = ninja
   }
+
+  public lazy var clangVersionOutput: String = {
+    let p = Process()
+    p.launchPath = clang.path
+    p.arguments = ["--version"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    p.launch()
+    p.waitUntilExit()
+    guard p.terminationReason == .exit && p.terminationStatus == 0 else {
+      fatalError("could not get clang --version")
+    }
+    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+  }()
+
+  public lazy var clangHasIndexSupport: Bool = {
+    clangVersionOutput.starts(with: "Apple") || clangVersionOutput.contains("swift-clang")
+  }()
 }
 
 /// Returns the path to the given tool, as found by `xcrun --find` on macOS, or `which` on Linux.
