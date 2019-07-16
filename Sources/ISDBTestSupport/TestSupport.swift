@@ -243,6 +243,27 @@ extension StaticTibsTestWorkspace {
   public func testLoc(_ name: String) -> TestLoc { sources.locations[name]! }
 }
 
+extension StaticTibsTestWorkspace {
+  public static let clangVersionOutput: String = {
+    let p = Process()
+    p.launchPath = StaticTibsTestWorkspace.defaultToolchain.clang.path
+    p.arguments = ["--version"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    p.launch()
+    p.waitUntilExit()
+    guard p.terminationReason == .exit && p.terminationStatus == 0 else {
+      fatalError("could not get clang --version")
+    }
+
+    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+  }()
+
+  public static let clangHasIndexSupport: Bool = {
+    clangVersionOutput.starts(with: "Apple") || clangVersionOutput.contains("swift-clang")
+  }()
+}
+
 extension XCTestCase {
 
   public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace {

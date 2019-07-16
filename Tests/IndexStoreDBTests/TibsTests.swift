@@ -43,6 +43,10 @@ final class TibsTests: XCTestCase {
   }
 
   func testMixedLangTarget() throws {
+    guard StaticTibsTestWorkspace.clangHasIndexSupport else {
+      fputs("warning: skipping test \(#function) because clang does not have indexstore support; use swift-clang", stderr)
+      return
+    }
     let ws = try staticTibsTestWorkspace(name: "MixedLangTarget")
     try ws.buildAndIndex()
     let index = ws.index
