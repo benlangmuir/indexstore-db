@@ -205,30 +205,21 @@ public final class StaticTibsTestWorkspace {
     try builder.writeBuildFiles()
     try fm.createDirectory(at: builder.indexstore, withIntermediateDirectories: true, attributes: nil)
 
-    let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.swiftc
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appendingPathComponent("lib/libIndexStore.\(dylibExt)", isDirectory: false)
-      .path)
+    let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.libIndexStore.path)
 
     self.tmpDir = tmpDir
 
     index = try IndexStoreDB(
       storePath: builder.indexstore.path,
       databasePath: tmpDir.path,
-      library: libIndexStore, listenToUnitEvents: false)
+      library: libIndexStore,
+      listenToUnitEvents: false)
   }
 
   deinit {
     _ = try? FileManager.default.removeItem(atPath: tmpDir.path)
   }
 }
-
-#if os(macOS)
-public let dylibExt = "dylib"
-#else
-public let dylibExt = "so"
-#endif
 
 extension StaticTibsTestWorkspace {
 

@@ -16,15 +16,29 @@ import Foundation
 public final class TibsToolchain {
   public let swiftc: URL
   public let clang: URL
+  public let libIndexStore: URL
   public let tibs: URL
   public let ninja: URL?
 
-  public init(swiftc: URL, clang: URL, tibs: URL, ninja: URL? = nil) {
+  public init(swiftc: URL, clang: URL, libIndexStore: URL? = nil, tibs: URL, ninja: URL? = nil) {
     self.swiftc = swiftc
     self.clang = clang
+
+    self.libIndexStore = libIndexStore ?? swiftc
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("lib/libIndexStore.\(TibsToolchain.dylibExt)", isDirectory: false)
+
     self.tibs = tibs
     self.ninja = ninja
   }
+
+
+#if os(macOS)
+  public static let dylibExt = "dylib"
+#else
+  public static let dylibExt = "so"
+#endif
 
   public private(set) lazy var clangVersionOutput: String = {
     let p = Process()
