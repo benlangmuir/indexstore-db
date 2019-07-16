@@ -22,30 +22,6 @@ final class TibsBuildTests: XCTestCase {
     tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
     ninja: findTool(name: "ninja"))
 
-  static let ninjaVersion: (Int, Int, Int) = {
-    let p = Process()
-    p.launchPath = TibsBuildTests.toolchain.ninja!.path
-    p.arguments = ["--version"]
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.launch()
-    p.waitUntilExit()
-    guard p.terminationReason == .exit && p.terminationStatus == 0 else {
-      fatalError("could not get ninja --version")
-    }
-
-    var out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
-    out = out.trimmingCharacters(in: .whitespacesAndNewlines)
-    let components = out.split(separator: ".", maxSplits: 3)
-    guard let maj = Int(String(components[0])),
-          let min = Int(String(components[1])),
-          let patch = components.count > 2 ? Int(String(components[2])) : 0
-    else {
-      fatalError("could not parsed ninja --version '\(out)'")
-    }
-    return (maj, min, patch)
-  }()
-
   /// Sleep long enough for file system timestamp to change. For example, older versions of ninja
   /// use 1 second timestamps.
   func sleepForTimestamp() {
@@ -54,7 +30,7 @@ final class TibsBuildTests: XCTestCase {
     // testing.
     var usec: UInt32 = 0
     var reason: String = ""
-    if TibsBuildTests.ninjaVersion < (1, 9, 0) {
+    if TibsBuildTests.toolchain.ninjaVersion < (1, 9, 0) {
       usec = 1_000_000
       reason = "upgrade to ninja >= 1.9.0 for high precision timestamp support"
     }

@@ -123,10 +123,10 @@ extension TibsBuilder {
       try buildImpl { process in
         process.standardOutput = pipe
       }
-    } catch {
+    } catch TibsBuilder.Error.buildFailure(let tc, let ts) {
       let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
       print(out)
-      throw error
+      throw TibsBuilder.Error.buildFailure(tc, exitCode: ts)
     }
 
     let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!

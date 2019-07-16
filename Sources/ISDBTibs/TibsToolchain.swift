@@ -26,7 +26,7 @@ public final class TibsToolchain {
     self.ninja = ninja
   }
 
-  public lazy var clangVersionOutput: String = {
+  public private(set) lazy var clangVersionOutput: String = {
     let p = Process()
     p.launchPath = clang.path
     p.arguments = ["--version"]
@@ -40,8 +40,33 @@ public final class TibsToolchain {
     return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
   }()
 
-  public lazy var clangHasIndexSupport: Bool = {
+  public private(set) lazy var clangHasIndexSupport: Bool = {
     clangVersionOutput.starts(with: "Apple") || clangVersionOutput.contains("swift-clang")
+  }()
+
+  public private(set) lazy var ninjaVersion: (Int, Int, Int) = {
+    precondition(ninja != nil, "expected non-nil ninja in ninjaVersion")
+    let p = Process()
+    p.launchPath = ninja!.path
+    p.arguments = ["--version"]
+    let pipe = Pipe()
+    p.standardOutput = pipe
+    p.launch()
+    p.waitUntilExit()
+    guard p.terminationReason == .exit && p.terminationStatus == 0 else {
+      fatalError("could not get ninja --version")
+    }
+
+    var out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)!
+    out = out.trimmingCharacters(in: .whitespacesAndNewlines)
+    let components = out.split(separator: ".", maxSplits: 3)
+    guard let maj = Int(String(components[0])),
+      let min = Int(String(components[1])),
+      let patch = components.count > 2 ? Int(String(components[2])) : 0
+      else {
+        fatalError("could not parsed ninja --version '\(out)'")
+    }
+    return (maj, min, patch)
   }()
 }
 
