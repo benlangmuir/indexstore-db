@@ -198,8 +198,7 @@ public final class StaticTibsTestWorkspace {
     let fm = FileManager.default
     try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
 
-    let manifestURL = projectDir.appendingPathComponent("project.json", isDirectory: false)
-    let manifest = try JSONDecoder().decode(TibsManifest.self, from: try Data(contentsOf: manifestURL))
+    let manifest = try TibsManifest.load(projectRoot: projectDir)
     builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: buildDir, toolchain: toolchain)
 
     try builder.writeBuildFiles()

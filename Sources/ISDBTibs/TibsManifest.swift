@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Manifest of a tibs project, describing each target and its dependencies.
+import Foundation
+
+/// Manifest of a tibs project, describing each target and its dependencies. By convention, it is
+/// located at `$SOURCE_ROOT/project.json`.
 ///
 /// Example:
 ///
@@ -104,5 +107,18 @@ extension TibsManifest: Codable {
       var container = encoder.container(keyedBy: CodingKeys.self)
       try container.encode(targets, forKey: .targets)
     }
+  }
+
+  /// The standard path to the manifest file relative to the project's the source root.
+  public static let standardPath: String = "project.json"
+
+  /// Load a tibs manifest for the given project directory.
+  ///
+  /// This is a convenience method that looks for the manifest file in `standardPath` and decodes it
+  /// from JSON. The resulting manifest does not reference the project directory, and can
+  /// subsequently be used with a different source root, for example after copying sources.
+  public static func load(projectRoot: URL) throws -> Self {
+    let manifestURL = projectRoot.appendingPathComponent(standardPath, isDirectory: false)
+    return try JSONDecoder().decode(Self.self, from: try Data(contentsOf: manifestURL))
   }
 }

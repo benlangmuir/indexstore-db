@@ -69,14 +69,12 @@ func main(arguments: [String]) {
   }
 
   let projectDir = URL(fileURLWithPath: arguments.last!, isDirectory: true)
-  let manifestURL = projectDir.appendingPathComponent("project.json", isDirectory: false)
 
   let manifest: TibsManifest
   do {
-    let data = try Data(contentsOf: manifestURL)
-    manifest = try JSONDecoder().decode(TibsManifest.self, from: data)
+    manifest = try TibsManifest.load(projectRoot: projectDir)
   } catch {
-    print("error: could not read manifest '\(manifestURL.path)': \(error)", to: &stderr)
+    print("error: could not read manifest for '\(projectDir.path)': \(error)", to: &stderr)
     exit(1)
   }
 
@@ -91,7 +89,7 @@ func main(arguments: [String]) {
   do {
     builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: cwd, toolchain: toolchain)
   } catch {
-    print("error: could not resolve project '\(manifestURL.path)': \(error)", to: &stderr)
+    print("error: could not resolve project at '\(projectDir.path)': \(error)", to: &stderr)
     exit(1)
   }
 

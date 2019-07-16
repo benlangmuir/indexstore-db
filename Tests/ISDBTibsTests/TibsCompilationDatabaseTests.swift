@@ -25,7 +25,7 @@ final class TibsCompilationDatabaseTests: XCTestCase {
 
   public func testCompilationDatabaseSwiftModule() throws {
     let dir = projectDir("SwiftModules")
-    let m = try manifest(projectDir: dir)
+    let m = try TibsManifest.load(projectRoot: dir)
     let tc = TibsCompilationDatabaseTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
@@ -79,7 +79,7 @@ final class TibsCompilationDatabaseTests: XCTestCase {
 
   public func testCompilationDatabaseMixedLangTarget() throws {
     let dir = projectDir("MixedLangTarget")
-    let m = try manifest(projectDir: dir)
+    let m = try TibsManifest.load(projectRoot: dir)
     let tc = TibsCompilationDatabaseTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)

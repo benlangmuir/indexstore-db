@@ -24,7 +24,7 @@ final class TibsResolutionTests: XCTestCase {
 
   func testResolutionSingleSwiftModule() throws {
     let dir = projectDir("proj1")
-    let m = try manifest(projectDir: dir)
+    let m = try TibsManifest.load(projectRoot: dir)
     let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
@@ -57,7 +57,7 @@ final class TibsResolutionTests: XCTestCase {
 
   func testResolutionMixedLangTarget() throws {
     let dir = projectDir("MixedLangTarget")
-    let m = try manifest(projectDir: dir)
+    let m = try TibsManifest.load(projectRoot: dir)
     let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
@@ -120,7 +120,7 @@ final class TibsResolutionTests: XCTestCase {
 
   func testResolutionSwiftModules() throws {
     let dir = projectDir("SwiftModules")
-    let m = try manifest(projectDir: dir)
+    let m = try TibsManifest.load(projectRoot: dir)
     let tc = TibsResolutionTests.fakeToolchain
     let src = URL(fileURLWithPath: "/src", isDirectory: true)
     let build = URL(fileURLWithPath: "/build", isDirectory: true)
@@ -199,10 +199,4 @@ func projectDir(_ name: String) -> URL {
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .appendingPathComponent("INPUTS/\(name)", isDirectory: true)
-}
-
-func manifest(projectDir: URL) throws -> TibsManifest {
-  let manifestData = try Data(
-    contentsOf: projectDir.appendingPathComponent("project.json", isDirectory: false))
-  return try JSONDecoder().decode(TibsManifest.self, from:  manifestData)
 }

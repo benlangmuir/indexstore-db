@@ -66,7 +66,7 @@ final class TibsBuildTests: XCTestCase {
     let projSource = projectDir(project)
     try fm.copyItem(at: projSource, to: sourceRoot)
     return try TibsBuilder(
-      manifest: try manifest(projectDir: projSource),
+      manifest: try TibsManifest.load(projectRoot: projSource),
       sourceRoot: sourceRoot,
       buildRoot: buildRoot,
       toolchain: TibsBuildTests.toolchain)
