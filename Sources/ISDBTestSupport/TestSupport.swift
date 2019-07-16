@@ -209,7 +209,7 @@ public final class StaticTibsTestWorkspace {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .appendingPathComponent("lib/libIndexStore.\(dylibExt)", isDirectory: false)
-      .path) // FIXME: non-Mac
+      .path)
 
     self.tmpDir = tmpDir
 
