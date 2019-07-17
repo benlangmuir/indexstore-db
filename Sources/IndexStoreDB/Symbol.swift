@@ -12,59 +12,54 @@
 
 import CIndexStoreDB
 
-public enum IndexSymbolKind {
-  case unknown
-  case module
-  case namespace
-  case namespaceAlias
-  case macro
-  case `enum`
-  case `struct`
-  case `class`
-  case `protocol`
-  case `extension`
-  case union
-  case `typealias`
-  case function
-  case variable
-  case field
-  case enumConstant
-  case instanceMethod
-  case classMethod
-  case staticMethod
-  case instanceProperty
-  case classProperty
-  case staticProperty
-  case constructor
-  case destructor
-  case conversionFunction
-  case parameter
-  case using
+// FIXME: remove
+public typealias IndexSymbolKind = Symbol.Kind
 
-  case commentTag
-}
+public struct Symbol: Equatable {
 
-public final class Symbol {
-
-  let value: indexstoredb_symbol_t
-
-  public lazy var usr: String = String(cString: indexstoredb_symbol_usr(value))
-  public lazy var name: String = String(cString: indexstoredb_symbol_name(value))
-  public lazy var kind: IndexSymbolKind = IndexSymbolKind(indexstoredb_symbol_kind(value))
-
-  init(_ value: indexstoredb_symbol_t) {
-    self.value = value
+  public enum Kind: Hashable {
+    case unknown
+    case module
+    case namespace
+    case namespaceAlias
+    case macro
+    case `enum`
+    case `struct`
+    case `class`
+    case `protocol`
+    case `extension`
+    case union
+    case `typealias`
+    case function
+    case variable
+    case field
+    case enumConstant
+    case instanceMethod
+    case classMethod
+    case staticMethod
+    case instanceProperty
+    case classProperty
+    case staticProperty
+    case constructor
+    case destructor
+    case conversionFunction
+    case parameter
+    case using
+    case commentTag
   }
 
-  deinit {
-    indexstoredb_release(value)
+  public var usr: String
+  public var name: String
+  public var kind: Kind
+
+  init(usr: String, name: String, kind: Kind) {
+    self.usr = usr
+    self.name = name
+    self.kind = kind
   }
 }
 
-extension Symbol: Equatable, Comparable {
-  public static func ==(a: Symbol, b: Symbol) -> Bool {
-    return (a.usr, a.name) == (b.usr, b.name)
-  }
+extension Symbol: Comparable {
   public static func <(a: Symbol, b: Symbol) -> Bool {
     return (a.usr, a.name) < (b.usr, b.name)
   }
@@ -76,7 +71,23 @@ extension Symbol: CustomStringConvertible {
   }
 }
 
-extension IndexSymbolKind {
+// MARK: CIndexStoreDB conversions
+
+extension Symbol {
+
+  /// Note: `value` is expected to be passed +1.
+  init(_ value: indexstoredb_symbol_t) {
+    self.init(
+      usr: String(cString: indexstoredb_symbol_usr(value)),
+      name: String(cString: indexstoredb_symbol_name(value)),
+      kind: Kind(indexstoredb_symbol_kind(value)))
+
+    // FIXME: remove unnecessary refcounting of symbols.
+    indexstoredb_release(value)
+  }
+}
+
+extension Symbol.Kind {
   init(_ cSymbolKind: indexstoredb_symbol_kind_t) {
     switch cSymbolKind {
     case INDEXSTOREDB_SYMBOL_KIND_UNKNOWN:

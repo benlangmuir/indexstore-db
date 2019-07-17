@@ -24,13 +24,6 @@ public struct SymbolLocation: Equatable {
     self.line = line
     self.utf8Column = utf8Column
   }
-
-  public init(_ loc: indexstoredb_symbol_location_t) {
-    path = String(cString: indexstoredb_symbol_location_path(loc))
-    isSystem = indexstoredb_symbol_location_is_system(loc)
-    line = Int(indexstoredb_symbol_location_line(loc))
-    utf8Column = Int(indexstoredb_symbol_location_column_utf8(loc))
-  }
 }
 
 extension SymbolLocation: Comparable {
@@ -43,5 +36,16 @@ extension SymbolLocation: Comparable {
 extension SymbolLocation: CustomStringConvertible {
   public var description: String {
     "\(path):\(line):\(utf8Column)\(isSystem ? " [system]" : "")"
+  }
+}
+
+// MARK: CIndexStoreDB conversions
+
+extension SymbolLocation {
+  public init(_ loc: indexstoredb_symbol_location_t) {
+    path = String(cString: indexstoredb_symbol_location_path(loc))
+    isSystem = indexstoredb_symbol_location_is_system(loc)
+    line = Int(indexstoredb_symbol_location_line(loc))
+    utf8Column = Int(indexstoredb_symbol_location_column_utf8(loc))
   }
 }
