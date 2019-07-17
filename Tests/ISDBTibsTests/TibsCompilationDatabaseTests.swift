@@ -123,11 +123,3 @@ final class TibsCompilationDatabaseTests: XCTestCase {
     XCTAssertEqual(builder.compilationDatabase, expected)
   }
 }
-
-// Build
-//
-// Null and non-null rebuild
-// * Header change
-// * Source file change
-// * OFM change
-// * Ninja changes
