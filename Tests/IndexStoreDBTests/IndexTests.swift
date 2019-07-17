@@ -14,7 +14,7 @@ import IndexStoreDB
 import ISDBTestSupport
 import XCTest
 
-final class TibsTests: XCTestCase {
+final class IndexTests: XCTestCase {
 
   func testBasic() throws {
     guard let ws = try staticTibsTestWorkspace(name: "proj1") else { return }
