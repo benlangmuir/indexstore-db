@@ -96,10 +96,28 @@ public final class IndexStoreDB {
     }
   }
 
+  public func occurrences(relatedToUSR usr: String, roles: SymbolRole) -> [SymbolOccurrence] {
+    var result: [SymbolOccurrence] = []
+    forEachRelatedSymbolOccurrence(byUSR: usr, roles: roles) { occur in
+      result.append(occur)
+      return true
+    }
+    return result
+  }
+
   @discardableResult public func forEachCanonicalSymbolOccurrence(byName: String, body: @escaping (SymbolOccurrence) -> Bool) -> Bool {
     return indexstoredb_index_canonical_symbol_occurences_by_name(impl, byName) { occur in
       return body(SymbolOccurrence(occur))
     }
+  }
+
+  public func canonicalOccurrences(ofName name: String) -> [SymbolOccurrence] {
+    var result: [SymbolOccurrence] = []
+    forEachCanonicalSymbolOccurrence(byName: name) { occur in
+      result.append(occur)
+      return true
+    }
+    return result
   }
 
   @discardableResult public func forEachCanonicalSymbolOccurrence(
@@ -122,6 +140,26 @@ public final class IndexStoreDB {
     }
   }
 
+  public func canonicalOccurrences(
+    containing pattern: String,
+    anchorStart: Bool,
+    anchorEnd: Bool,
+    subsequence: Bool,
+    ignoreCase: Bool
+  ) -> [SymbolOccurrence] {
+    var result: [SymbolOccurrence] = []
+    forEachCanonicalSymbolOccurrence(
+      containing: pattern,
+      anchorStart: anchorStart,
+      anchorEnd: anchorEnd,
+      subsequence: subsequence,
+      ignoreCase: ignoreCase)
+    { occur in
+      result.append(occur)
+      return true
+    }
+    return result
+  }
 }
 
 public protocol IndexStoreLibraryProvider {

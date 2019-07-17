@@ -29,19 +29,57 @@ final class TibsTests: XCTestCase {
 
     let csym = Symbol(usr: usr, name: "c()", kind: .function)
     let asym = Symbol(usr: "s:4main1ayyF", name: "a()", kind: .function)
+
+    let ccanon = SymbolOccurrence(
+      symbol: csym,
+      location: SymbolLocation(ws.testLoc("c")),
+      roles: [.definition, .canonical],
+      relations: [])
+
+    let ccall = SymbolOccurrence(
+      symbol: csym,
+      location: SymbolLocation(ws.testLoc("c:call")),
+      roles: [.reference, .call, .calledBy, .containedBy],
+      relations: [
+        .init(symbol: asym, roles: [.calledBy, .containedBy])
+    ])
+
     checkOccurrences(getOccs(), expected: [
+      ccanon,
+      ccall,
+    ])
+
+    checkOccurrences(index.canonicalOccurrences(ofName: "c()"), expected: [
+      ccanon,
+    ])
+
+    checkOccurrences(index.canonicalOccurrences(ofName: "c"), expected: [])
+
+    checkOccurrences(index.canonicalOccurrences(containing: "c",
+      anchorStart: true, anchorEnd: false, subsequence: false,
+      ignoreCase: false), expected: [ccanon])
+
+    checkOccurrences(index.canonicalOccurrences(containing: "c",
+      anchorStart: true, anchorEnd: true, subsequence: false,
+      ignoreCase: false), expected: [])
+
+    checkOccurrences(index.canonicalOccurrences(containing: "C",
+      anchorStart: true, anchorEnd: false, subsequence: false,
+      ignoreCase: true), expected: [ccanon])
+
+    checkOccurrences(index.canonicalOccurrences(containing: "C",
+      anchorStart: true, anchorEnd: false, subsequence: false,
+      ignoreCase: false), expected: [])
+
+    checkOccurrences(index.occurrences(relatedToUSR: "s:4main1ayyF", roles: .calledBy), expected: [
+      ccall,
       SymbolOccurrence(
-        symbol: csym,
-        location: SymbolLocation(ws.testLoc("c")),
-        roles: [.definition, .canonical],
-        relations: []),
-      SymbolOccurrence(
-        symbol: csym,
-        location: SymbolLocation(ws.testLoc("c:call")),
+        symbol: Symbol(usr: "s:4main1byyF", name: "b()", kind: .function),
+        location: SymbolLocation(ws.testLoc("b:call")),
         roles: [.reference, .call, .calledBy, .containedBy],
         relations: [
           .init(symbol: asym, roles: [.calledBy, .containedBy])
-        ])
+      ])
     ])
   }
 
