@@ -32,7 +32,7 @@ public struct SymbolOccurrence: Equatable {
   public var roles: SymbolRole
   public var relations: [Relation]
 
-  init(symbol: Symbol, location: SymbolLocation, roles: SymbolRole, relations: [Relation] = []) {
+  public init(symbol: Symbol, location: SymbolLocation, roles: SymbolRole, relations: [Relation] = []) {
     self.symbol = symbol
     self.location = location
     self.roles = roles
@@ -55,8 +55,7 @@ extension SymbolOccurrence.Relation: Comparable {
 
 extension SymbolOccurrence: CustomStringConvertible {
   public var description: String {
-    // FIXME: incorporate relations
-    "\(symbol) @\(location) roles:\(roles)"
+    "\(location) | \(symbol) | \(roles)" + relations.flatMap { "\n\t\($0.roles) | \($0.symbol.usr)" }
   }
 }
 

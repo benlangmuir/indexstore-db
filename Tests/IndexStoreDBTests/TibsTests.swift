@@ -20,26 +20,29 @@ final class TibsTests: XCTestCase {
     guard let ws = try staticTibsTestWorkspace(name: "proj1") else { return }
     let index = ws.index
 
-    let getOccs = { index.occurrences(ofUSR: "s:4main1cyyF", roles: [.reference, .definition]) }
+    let usr = "s:4main1cyyF"
+    let getOccs = { index.occurrences(ofUSR: usr, roles: [.reference, .definition]) }
 
     XCTAssertEqual(0, getOccs().count)
 
     try ws.buildAndIndex()
 
-    let occs = getOccs()
-    XCTAssertEqual(2, occs.count)
-    guard occs.count == 2 else { return }
-
-    XCTAssertEqual(occs[0].symbol.name, "c()")
-    XCTAssertEqual(occs[0].symbol.usr, "s:4main1cyyF")
-    if occs[0].roles.contains(.definition) {
-      XCTAssertEqual(occs[0].roles, [.definition, .canonical])
-      let loc = ws.testLoc("c")
-      XCTAssertEqual(occs[0].location, SymbolLocation(path: loc.url.path, isSystem: false, line: loc.line, utf8Column: loc.column))
-    } else {
-      let loc = ws.testLoc("c:call")
-      XCTAssertEqual(occs[0].location, SymbolLocation(path: loc.url.path, isSystem: false, line: loc.line, utf8Column: loc.column))
-    }
+    let csym = Symbol(usr: usr, name: "c()", kind: .function)
+    let asym = Symbol(usr: "s:4main1ayyF", name: "a()", kind: .function)
+    checkOccurrences(getOccs(), expected: [
+      SymbolOccurrence(
+        symbol: csym,
+        location: SymbolLocation(ws.testLoc("c")),
+        roles: [.definition, .canonical],
+        relations: []),
+      SymbolOccurrence(
+        symbol: csym,
+        location: SymbolLocation(ws.testLoc("c:call")),
+        roles: [.reference, .call, .calledBy, .containedBy],
+        relations: [
+          .init(symbol: asym, roles: [.calledBy, .containedBy])
+        ])
+    ])
   }
 
   func testMixedLangTarget() throws {
@@ -139,6 +142,64 @@ final class TibsTests: XCTestCase {
       ws.testLoc("c:call"),
       ws.testLoc("c:anotherOne"),
     ])
+  }
+}
+
+func checkOccurrences(
+  _ occurs: [SymbolOccurrence],
+  expected: [SymbolOccurrence],
+  ignoreRelations: Bool = false,
+  file: StaticString = #file,
+  line: UInt = #line)
+{
+  var expected: [SymbolOccurrence] = expected
+  var actual: [SymbolOccurrence] = occurs
+
+  if ignoreRelations {
+    for i in expected.indices {
+      expected[i].relations = []
+    }
+    for i in actual.indices {
+      actual[i].relations = []
+    }
+  }
+
+  expected.sort()
+  actual.sort()
+
+  var ai = actual.startIndex
+  let aend = actual.endIndex
+  var ei = expected.startIndex
+  let eend = expected.endIndex
+
+  func compare(_ a: SymbolOccurrence, _ b: SymbolOccurrence) -> ComparisonResult {
+    if a == b { return .orderedSame }
+    if a < b { return .orderedAscending }
+    return .orderedDescending
+  }
+
+  while ai != aend && ei != eend {
+    switch compare(actual[ai], expected[ei]) {
+    case .orderedSame:
+      actual.formIndex(after: &ai)
+      expected.formIndex(after: &ei)
+    case .orderedAscending:
+      XCTFail("unexpected symbol occurrence \(actual[ai])", file: file, line: line)
+      actual.formIndex(after: &ai)
+    case .orderedDescending:
+      XCTFail("missing expected symbol occurrence \(expected[ei])", file: file, line: line)
+      expected.formIndex(after: &ei)
+    }
+  }
+
+  while ai != aend {
+    XCTFail("unexpected symbol occurrence \(actual[ai])", file: file, line: line)
+    actual.formIndex(after: &ai)
+  }
+
+  while ei != eend {
+    XCTFail("missing expected symbol occurrence \(expected[ei])", file: file, line: line)
+    expected.formIndex(after: &ei)
   }
 }
 

@@ -52,7 +52,7 @@ public struct Symbol: Equatable {
   public var name: String
   public var kind: Kind
 
-  init(usr: String, name: String, kind: Kind) {
+  public init(usr: String, name: String, kind: Kind) {
     self.usr = usr
     self.name = name
     self.kind = kind
@@ -67,7 +67,7 @@ extension Symbol: Comparable {
 
 extension Symbol: CustomStringConvertible {
   public var description: String {
-    "\(name) [\(usr)]"
+    "\(name) | \(kind) | \(usr)"
   }
 }
 

@@ -42,6 +42,16 @@ extension TestLoc {
   }
 }
 
+extension SymbolLocation {
+  public init(_ loc: TestLoc, isSystem: Bool = false) {
+    self.init(
+      path: loc.url.path,
+      isSystem: isSystem,
+      line: loc.line,
+      utf8Column: loc.column)
+  }
+}
+
 extension TestLoc: CustomStringConvertible {
   public var description: String { "\(url.path):\(line):\(column)" }
 }
