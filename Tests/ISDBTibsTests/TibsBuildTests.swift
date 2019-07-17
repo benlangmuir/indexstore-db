@@ -22,27 +22,6 @@ final class TibsBuildTests: XCTestCase {
     tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
     ninja: findTool(name: "ninja"))
 
-  /// Sleep long enough for file system timestamp to change. For example, older versions of ninja
-  /// use 1 second timestamps.
-  func sleepForTimestamp() {
-    // FIXME: this method is very incomplete. If we're running on a filesystem that doesn't support
-    // high resolution time stamps, we'll need to detect that here. This should only be done for
-    // testing.
-    var usec: UInt32 = 0
-    var reason: String = ""
-    if TibsBuildTests.toolchain.ninjaVersion < (1, 9, 0) {
-      usec = 1_000_000
-      reason = "upgrade to ninja >= 1.9.0 for high precision timestamp support"
-    }
-
-    if usec > 0 {
-      let fsec = Float(usec) / 1_000_000
-      fputs("warning: waiting \(fsec) second\(fsec == 1.0 ? "" : "s") to ensure file timestamp " +
-            "differs; \(reason)\n", stderr)
-      usleep(usec)
-    }
-  }
-
   var fm: FileManager = FileManager.default
   var testDir: URL! = nil
   var sourceRoot: URL! = nil
@@ -83,11 +62,11 @@ final class TibsBuildTests: XCTestCase {
     try fm.moveItem(at: aswift, to: aswift2)
     XCTAssertThrowsError(try builder._buildTest())
 
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     try fm.moveItem(at: aswift2, to: aswift)
     XCTAssertEqual(try builder._buildTest(), [])
 
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     try "func a() -> Int { 0 }".write(to: aswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module main"])
   }
@@ -99,12 +78,12 @@ final class TibsBuildTests: XCTestCase {
     XCTAssertEqual(try builder._buildTest(), [])
 
     let bswift = sourceRoot.appendingPathComponent("b.swift", isDirectory: false)
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     try "public func bbb() -> Int { 0 }".write(to: bswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module B", "Swift Module C"])
 
     let cswift = sourceRoot.appendingPathComponent("c.swift", isDirectory: false)
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     try "import B\nfunc test() { let _: Int = bbb() }".write(to: cswift, atomically: false, encoding: .utf8)
     XCTAssertEqual(try builder._buildTest(), ["Swift Module C"])
     XCTAssertEqual(try builder._buildTest(), [])
@@ -128,13 +107,13 @@ final class TibsBuildTests: XCTestCase {
     // touch
     var content = try Data(contentsOf: ch)
     content.append(" ".utf8.first!)
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     try content.write(to: ch)
     // FIXME: there is a false dependency because of the generated header main-Swift.h
     XCTAssertEqual(try builder._buildTest(),
       ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
 
-    sleepForTimestamp()
+    builder.toolchain.sleepForTimestamp()
     let dh = sourceRoot.appendingPathComponent("d.h", isDirectory: false)
     try """
       class D {};

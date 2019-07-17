@@ -70,6 +70,10 @@ public final class SourceFileCache {
     cache[file] = content
     return content
   }
+
+  public func set(_ file: URL, to content: String?) {
+    cache[file] = content
+  }
 }
 
 public struct LocationScanner {
@@ -177,9 +181,71 @@ public final class TestSources {
     self.rootDirectory = rootDirectory
     self.locations = try scanLocations(rootDirectory: rootDirectory, sourceCache: sourceCache)
   }
+
+  public struct ChangeSet {
+    public var remove: [URL] = []
+    public var rename: [(URL, URL)] = []
+    public var write: [(URL, String)] = []
+
+    public func isDirty(_ url: URL) -> Bool {
+      return remove.contains(url)
+        || rename.contains { $0 == url || $1 == url }
+        || write.contains { $0.0 == url }
+    }
+  }
+
+  public struct ChangeBuilder {
+    public var changes: ChangeSet = ChangeSet()
+    var seen: Set<URL> = []
+
+    public mutating func write(_ content: String, to url: URL) {
+      precondition(seen.insert(url).inserted, "multiple edits to same file")
+      changes.write.append((url, content))
+    }
+    public mutating func remove(_ url: URL) {
+      precondition(seen.insert(url).inserted, "multiple edits to same file")
+      changes.remove.append(url)
+    }
+    public mutating func rename(from: URL, to: URL) {
+      precondition(seen.insert(from).inserted && seen.insert(to).inserted, "multiple edits to same file")
+      changes.rename.append((from, to))
+    }
+  }
+
+  public func apply(_ changes: ChangeSet) throws {
+    for (url, content) in changes.write {
+      guard let data = content.data(using: .utf8) else {
+        fatalError("failed to encode edited contents to utf8")
+      }
+      try data.write(to: url)
+      sourceCache.set(url, to: content)
+    }
+
+    let fm = FileManager.default
+    for (from, to) in changes.rename {
+      try fm.moveItem(at: from, to: to)
+      sourceCache.set(to, to: sourceCache.cache[from])
+      sourceCache.set(from, to: nil)
+    }
+
+    for url in changes.remove {
+      try fm.removeItem(at: url)
+      sourceCache.set(url, to: nil)
+    }
+
+    // FIXME: update incrementally without rescanning everything.
+    locations = try scanLocations(rootDirectory: rootDirectory, sourceCache: sourceCache)
+  }
+
+  public func edit(_ block: (inout ChangeBuilder) throws -> ()) throws -> ChangeSet {
+    var builder = ChangeBuilder()
+    try block(&builder)
+    try apply(builder.changes)
+    return builder.changes
+  }
 }
 
-public final class StaticTibsTestWorkspace {
+public final class TibsTestWorkspace {
 
   public static let defaultToolchain = TibsToolchain(
     swiftc: findTool(name: "swiftc")!,
@@ -187,28 +253,119 @@ public final class StaticTibsTestWorkspace {
     tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
     ninja: findTool(name: "ninja"))
 
-  public var sources: TestSources
-  public var builder: TibsBuilder
-  public var index: IndexStoreDB
+  /// The directory containing the original, unmodified project.
+  public let projectDir: URL
+
+  /// A test-specific directory that we can put temporary files into.
   public let tmpDir: URL
 
-  public init(projectDir: URL, buildDir: URL, tmpDir: URL, toolchain: TibsToolchain) throws {
-    sources = try TestSources(rootDirectory: projectDir)
+  /// Whether the sources can be modified during this test. If this is true, we can call `edit()`.
+  public let mutableSources: Bool
+
+  /// The source files used by the test. If `mutableSources == false`, they are located in
+  /// `projectDir`. Otherwise, they are copied to a temporary location.
+  public let sources: TestSources
+
+  /// The current resolved project and builder.
+  public var builder: TibsBuilder
+
+  /// The source code index.
+  public var index: IndexStoreDB
+
+  /// Creates a tibs test workspace for a given project with immutable sources and a build directory
+  /// that can persist across test runs (typically inside the main project build directory).
+  ///
+  /// The `edit()` method is disallowed.
+  ///
+  /// * parameters:
+  ///   * immutableProjectDir: The directory containing the project.
+  ///   * persistentBuildDir: The directory to build in.
+  ///   * tmpDir: A test-specific directory that we can put temporary files into. Will be cleared
+  ///       by `deinit`.
+  ///   * toolchain: The toolchain to use for building and indexing.
+  ///
+  /// * throws: If there are any file system errors.
+  public init(
+    immutableProjectDir: URL,
+    persistentBuildDir: URL,
+    tmpDir: URL,
+    toolchain: TibsToolchain) throws
+  {
+    self.projectDir = immutableProjectDir
+    self.tmpDir = tmpDir
+    self.mutableSources = false
 
     let fm = FileManager.default
-    try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
+    _ = try? fm.removeItem(at: tmpDir)
+
+    try fm.createDirectory(at: persistentBuildDir, withIntermediateDirectories: true, attributes: nil)
+    let databaseDir = tmpDir
+    try fm.createDirectory(at: databaseDir, withIntermediateDirectories: true, attributes: nil)
+
+    self.sources = try TestSources(rootDirectory: projectDir)
 
     let manifest = try TibsManifest.load(projectRoot: projectDir)
-    builder = try TibsBuilder(manifest: manifest, sourceRoot: projectDir, buildRoot: buildDir, toolchain: toolchain)
+    builder = try TibsBuilder(
+      manifest: manifest,
+      sourceRoot: projectDir,
+      buildRoot: persistentBuildDir,
+      toolchain: toolchain)
+
+    try fm.createDirectory(at: builder.indexstore, withIntermediateDirectories: true, attributes: nil)
 
     try builder.writeBuildFiles()
-    try fm.createDirectory(at: builder.indexstore, withIntermediateDirectories: true, attributes: nil)
 
     let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.libIndexStore.path)
 
-    self.tmpDir = tmpDir
+    self.index = try IndexStoreDB(
+      storePath: builder.indexstore.path,
+      databasePath: tmpDir.path,
+      library: libIndexStore,
+      listenToUnitEvents: false)
+  }
 
-    index = try IndexStoreDB(
+  /// Creates a tibs test workspace and copies the sources to a temporary location so that they can
+  /// be modified (using `edit()`) and rebuilt during the test.
+  ///
+  /// * parameters:
+  ///   * projectDir: The directory containing the project. The sources will be copied to a
+  ///       temporary location.
+  ///   * tmpDir: A test-specific directory that we can put temporary files into. Will be cleared
+  ///       by `deinit`.
+  ///   * toolchain: The toolchain to use for building and indexing.
+  ///
+  /// * throws: If there are any file system errors.
+  public init(projectDir: URL, tmpDir: URL, toolchain: TibsToolchain) throws {
+    self.projectDir = projectDir
+    self.tmpDir = tmpDir
+    self.mutableSources = true
+
+    let fm = FileManager.default
+    _ = try? fm.removeItem(at: tmpDir)
+
+    let buildDir = tmpDir.appendingPathComponent("build", isDirectory: true)
+    try fm.createDirectory(at: buildDir, withIntermediateDirectories: true, attributes: nil)
+    let sourceDir = tmpDir.appendingPathComponent("src", isDirectory: true)
+    try fm.copyItem(at: projectDir, to: sourceDir)
+    let databaseDir = tmpDir.appendingPathComponent("db", isDirectory: true)
+    try fm.createDirectory(at: databaseDir, withIntermediateDirectories: true, attributes: nil)
+
+    self.sources = try TestSources(rootDirectory: sourceDir)
+
+    let manifest = try TibsManifest.load(projectRoot: projectDir)
+    builder = try TibsBuilder(
+      manifest: manifest,
+      sourceRoot: sourceDir,
+      buildRoot: buildDir,
+      toolchain: toolchain)
+
+    try fm.createDirectory(at: builder.indexstore, withIntermediateDirectories: true, attributes: nil)
+
+    try builder.writeBuildFiles()
+
+    let libIndexStore = try IndexStoreLibrary(dylibPath: toolchain.libIndexStore.path)
+
+    self.index = try IndexStoreDB(
       storePath: builder.indexstore.path,
       databasePath: tmpDir.path,
       library: libIndexStore,
@@ -218,33 +375,45 @@ public final class StaticTibsTestWorkspace {
   deinit {
     _ = try? FileManager.default.removeItem(atPath: tmpDir.path)
   }
-}
-
-extension StaticTibsTestWorkspace {
 
   public func buildAndIndex() throws {
-    try builder.build()
-    index.pollForUnitChangesAndWait()
-  }
-}
-
-extension StaticTibsTestWorkspace {
+     try builder.build()
+     index.pollForUnitChangesAndWait()
+   }
 
   public func testLoc(_ name: String) -> TestLoc { sources.locations[name]! }
+
+  /// Perform a group of edits to the project sources and optionally rebuild.
+  public func edit(
+    rebuild: Bool = false,
+    _ block: (inout TestSources.ChangeBuilder, _ current: SourceFileCache) throws -> ()) throws
+  {
+    precondition(mutableSources, "tried to edit in immutable workspace")
+    builder.toolchain.sleepForTimestamp()
+
+    let cache = sources.sourceCache
+    _ = try sources.edit { builder in
+      try block(&builder, cache)
+    }
+    // FIXME: support editing the project.json and update the build settings.
+    if rebuild {
+      try buildAndIndex()
+    }
+  }
 }
 
 extension XCTestCase {
 
   /// Returns nil and prints a warning if toolchain does not support this test.
-  public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> StaticTibsTestWorkspace? {
+  public func staticTibsTestWorkspace(name: String, testFile: String = #file) throws -> TibsTestWorkspace? {
     let testDirName = testDirectoryName
 
-    let toolchain = StaticTibsTestWorkspace.defaultToolchain
+    let toolchain = TibsTestWorkspace.defaultToolchain
 
-    let workspace = try StaticTibsTestWorkspace(
-      projectDir: inputsDirectory(testFile: testFile)
+    let workspace = try TibsTestWorkspace(
+      immutableProjectDir: inputsDirectory(testFile: testFile)
         .appendingPathComponent(name, isDirectory: true),
-      buildDir: XCTestCase.productsDirectory
+      persistentBuildDir: XCTestCase.productsDirectory
         .appendingPathComponent("isdb-tests/\(testDirName)", isDirectory: true),
       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
         .appendingPathComponent("isdb-test-data/\(testDirName)", isDirectory: true),
@@ -259,6 +428,29 @@ extension XCTestCase {
 
     return workspace
   }
+
+  /// Returns nil and prints a warning if toolchain does not support this test.
+   public func mutableTibsTestWorkspace(name: String, testFile: String = #file) throws -> TibsTestWorkspace? {
+     let testDirName = testDirectoryName
+
+     let toolchain = TibsTestWorkspace.defaultToolchain
+
+     let workspace = try TibsTestWorkspace(
+       projectDir: inputsDirectory(testFile: testFile)
+         .appendingPathComponent(name, isDirectory: true),
+       tmpDir: URL(fileURLWithPath: NSTemporaryDirectory())
+         .appendingPathComponent("isdb-test-data/\(testDirName)", isDirectory: true),
+       toolchain: toolchain)
+
+     if workspace.builder.targets.contains(where: { target in !target.clangTUs.isEmpty })
+       && !toolchain.clangHasIndexSupport {
+       fputs("warning: skipping test because '\(toolchain.clang.path)' does not have indexstore " +
+             "support; use swift-clang\n", stderr)
+       return nil
+     }
+
+     return workspace
+   }
 
   /// The path the the test INPUTS directory.
   public func inputsDirectory(testFile: String = #file) -> URL {

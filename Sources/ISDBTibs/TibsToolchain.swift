@@ -82,6 +82,27 @@ public final class TibsToolchain {
     }
     return (maj, min, patch)
   }()
+
+  /// Sleep long enough for file system timestamp to change. For example, older versions of ninja
+  /// use 1 second timestamps.
+  public func sleepForTimestamp() {
+    // FIXME: this method is very incomplete. If we're running on a filesystem that doesn't support
+    // high resolution time stamps, we'll need to detect that here. This should only be done for
+    // testing.
+    var usec: UInt32 = 0
+    var reason: String = ""
+    if ninjaVersion < (1, 9, 0) {
+      usec = 1_000_000
+      reason = "upgrade to ninja >= 1.9.0 for high precision timestamp support"
+    }
+
+    if usec > 0 {
+      let fsec = Float(usec) / 1_000_000
+      fputs("warning: waiting \(fsec) second\(fsec == 1.0 ? "" : "s") to ensure file timestamp " +
+            "differs; \(reason)\n", stderr)
+      usleep(usec)
+    }
+  }
 }
 
 /// Returns the path to the given tool, as found by `xcrun --find` on macOS, or `which` on Linux.

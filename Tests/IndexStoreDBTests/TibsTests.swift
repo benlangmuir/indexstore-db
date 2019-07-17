@@ -90,6 +90,56 @@ final class TibsTests: XCTestCase {
       ws.testLoc("aaa:call:c"),
     ])
   }
+
+  func testEditsSimple() throws {
+    guard let ws = try mutableTibsTestWorkspace(name: "proj1") else { return }
+    try ws.buildAndIndex()
+
+    let usr = "s:4main1cyyF"
+    let roles: SymbolRole = [.reference, .definition, .declaration]
+
+    checkOccurrences(ws.index.occurrences(ofUSR: usr, roles: roles), usr: usr, locations: [
+      ws.testLoc("c"),
+      ws.testLoc("c:call"),
+    ])
+
+    try ws.edit(rebuild: true) { editor, files in
+      let url = ws.testLoc("c:call").url
+      let new = try files.get(url).appending("""
+
+        func anotherOne() {
+          /*c:anotherOne*/c()
+        }
+        """)
+
+      editor.write(new, to: url)
+    }
+
+    checkOccurrences(ws.index.occurrences(ofUSR: usr, roles: roles), usr: usr, locations: [
+      ws.testLoc("c"),
+      ws.testLoc("c:call"),
+      ws.testLoc("c:anotherOne"),
+    ])
+
+    XCTAssertNotEqual(ws.testLoc("c").url, ws.testLoc("a:def").url)
+
+    try ws.edit(rebuild: true) { editor, files in
+      editor.write("", to: ws.testLoc("c").url)
+      let new = try files.get(ws.testLoc("a:def").url).appending("\nfunc /*c*/c() -> Int { 0 }")
+      editor.write(new, to: ws.testLoc("a:def").url)
+    }
+
+    XCTAssertEqual(ws.testLoc("c").url, ws.testLoc("a:def").url)
+
+    checkOccurrences(ws.index.occurrences(ofUSR: usr, roles: roles), usr: usr, locations: [])
+
+    let newUSR = "s:4main1cSiyF"
+    checkOccurrences(ws.index.occurrences(ofUSR: newUSR, roles: roles), usr: newUSR, locations: [
+      ws.testLoc("c"),
+      ws.testLoc("c:call"),
+      ws.testLoc("c:anotherOne"),
+    ])
+  }
 }
 
 func checkOccurrences(
