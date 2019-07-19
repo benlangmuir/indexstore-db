@@ -495,21 +495,37 @@ extension XCTestCase {
 }
 
 extension Symbol {
+
+  /// Returns a copy of the symbol with the new name, usr, and/or kind.
   public func with(name: String? = nil, usr: String? = nil, kind: Kind? = nil) -> Symbol {
     return Symbol(usr: usr ?? self.usr, name: name ?? self.name, kind: kind ?? self.kind)
   }
 
+  /// Returns a SymbolOccurrence with the given location and roles.
   public func at(_ location: TestLoc, roles: SymbolRole) -> SymbolOccurrence {
     return self.at(SymbolLocation(location), roles: roles)
   }
 
+  /// Returns a SymbolOccurrence with the given location and roles.
   public func at(_ location: SymbolLocation, roles: SymbolRole) -> SymbolOccurrence {
     return SymbolOccurrence(symbol: self, location: location, roles: roles)
   }
 }
 
+/// An XCTest assertion that the given symbol occurrences match the expected values, ignoring the
+/// order of results, and optionally ignoring relations. By default, the given occurrences also are
+/// allowed to have additional SymbolRoles.
+///
+/// If the occurrences to not match, signals a test failure using XCTFail or one of the other
+/// XCTest assertions.
+///
+/// * parameters:
+///   * actual: The set of occurrences to check, in any order.
+///   * ignoreRelations:
+///   * allowAdditionalRoles:
+///   * expected: The set of expected occurrences to check against, in any order.
 public func checkOccurrences(
-  _ occurs: [SymbolOccurrence],
+  _ actual: [SymbolOccurrence],
   ignoreRelations: Bool = true,
   allowAdditionalRoles: Bool = true,
   expected: [SymbolOccurrence],
@@ -517,7 +533,7 @@ public func checkOccurrences(
   line: UInt = #line)
 {
   var expected: [SymbolOccurrence] = expected
-  var actual: [SymbolOccurrence] = occurs
+  var actual: [SymbolOccurrence] = actual
 
   if ignoreRelations {
     for i in expected.indices {
