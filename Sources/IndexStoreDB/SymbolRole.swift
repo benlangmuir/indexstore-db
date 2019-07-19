@@ -45,6 +45,8 @@ public struct SymbolRole: OptionSet, Hashable {
   // fails to construct in Swift.
   public static let canonical: SymbolRole = SymbolRole(rawValue: 1 << 63)
 
+  public static let all: SymbolRole = SymbolRole(rawValue: ~0)
+
   public init(rawValue: UInt64) {
     self.rawValue = rawValue
   }

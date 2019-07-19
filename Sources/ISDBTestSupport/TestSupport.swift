@@ -493,3 +493,81 @@ extension XCTestCase {
     return "\(className).\(methodName)"
   }
 }
+
+extension Symbol {
+  public func with(name: String? = nil, usr: String? = nil, kind: Kind? = nil) -> Symbol {
+    return Symbol(usr: usr ?? self.usr, name: name ?? self.name, kind: kind ?? self.kind)
+  }
+
+  public func at(_ location: TestLoc, roles: SymbolRole) -> SymbolOccurrence {
+    return self.at(SymbolLocation(location), roles: roles)
+  }
+
+  public func at(_ location: SymbolLocation, roles: SymbolRole) -> SymbolOccurrence {
+    return SymbolOccurrence(symbol: self, location: location, roles: roles)
+  }
+}
+
+public func checkOccurrences(
+  _ occurs: [SymbolOccurrence],
+  ignoreRelations: Bool = true,
+  allowAdditionalRoles: Bool = true,
+  expected: [SymbolOccurrence],
+  file: StaticString = #file,
+  line: UInt = #line)
+{
+  var expected: [SymbolOccurrence] = expected
+  var actual: [SymbolOccurrence] = occurs
+
+  if ignoreRelations {
+    for i in expected.indices {
+      expected[i].relations = []
+    }
+    for i in actual.indices {
+      actual[i].relations = []
+    }
+  }
+
+  expected.sort()
+  actual.sort()
+
+  var ai = actual.startIndex
+  let aend = actual.endIndex
+  var ei = expected.startIndex
+  let eend = expected.endIndex
+
+  func compare(actual: SymbolOccurrence, expected: SymbolOccurrence) -> ComparisonResult {
+    var actual = actual
+    if allowAdditionalRoles {
+      actual.roles.formIntersection(expected.roles)
+    }
+
+    if actual == expected { return .orderedSame }
+    if actual < expected { return .orderedAscending }
+    return .orderedDescending
+  }
+
+  while ai != aend && ei != eend {
+    switch compare(actual: actual[ai], expected: expected[ei]) {
+    case .orderedSame:
+      actual.formIndex(after: &ai)
+      expected.formIndex(after: &ei)
+    case .orderedAscending:
+      XCTFail("unexpected symbol occurrence \(actual[ai])", file: file, line: line)
+      actual.formIndex(after: &ai)
+    case .orderedDescending:
+      XCTFail("missing expected symbol occurrence \(expected[ei])", file: file, line: line)
+      expected.formIndex(after: &ei)
+    }
+  }
+
+  while ai != aend {
+    XCTFail("unexpected symbol occurrence \(actual[ai])", file: file, line: line)
+    actual.formIndex(after: &ai)
+  }
+
+  while ei != eend {
+    XCTFail("missing expected symbol occurrence \(expected[ei])", file: file, line: line)
+    expected.formIndex(after: &ei)
+  }
+}

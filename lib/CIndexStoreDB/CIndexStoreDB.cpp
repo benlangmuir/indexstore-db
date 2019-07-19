@@ -22,6 +22,8 @@
 using namespace IndexStoreDB;
 using namespace index;
 
+static indexstoredb_symbol_kind_t toCSymbolKind(SymbolKind K);
+
 class IndexStoreDBObjectBase
     : public llvm::ThreadSafeRefCountedBase<IndexStoreDBObjectBase> {
 public:
@@ -166,7 +168,7 @@ indexstoredb_symbol_name(indexstoredb_symbol_t symbol) {
 indexstoredb_symbol_kind_t
 indexstoredb_symbol_kind(indexstoredb_symbol_t symbol) {
   auto symbolObj = (IndexStoreDBObject<std::shared_ptr<Symbol>> *)symbol;
-  return (indexstoredb_symbol_kind_t) symbolObj->value->getSymbolKind();
+  return toCSymbolKind(symbolObj->value->getSymbolKind());
 }
 
 bool
@@ -300,4 +302,65 @@ void
 indexstoredb_error_dispose(indexstoredb_error_t error) {
   if (error)
    delete (IndexStoreDBError *)error;
+}
+
+static indexstoredb_symbol_kind_t toCSymbolKind(SymbolKind K) {
+  switch (K) {
+  case SymbolKind::Unknown:
+    return INDEXSTOREDB_SYMBOL_KIND_UNKNOWN;
+  case SymbolKind::Module:
+    return INDEXSTOREDB_SYMBOL_KIND_MODULE;
+  case SymbolKind::Namespace:
+    return INDEXSTOREDB_SYMBOL_KIND_NAMESPACE;
+  case SymbolKind::NamespaceAlias:
+    return INDEXSTOREDB_SYMBOL_KIND_NAMESPACEALIAS;
+  case SymbolKind::Macro:
+    return INDEXSTOREDB_SYMBOL_KIND_MACRO;
+  case SymbolKind::Enum:
+    return INDEXSTOREDB_SYMBOL_KIND_ENUM;
+  case SymbolKind::Struct:
+    return INDEXSTOREDB_SYMBOL_KIND_STRUCT;
+  case SymbolKind::Class:
+    return INDEXSTOREDB_SYMBOL_KIND_CLASS;
+  case SymbolKind::Protocol:
+    return INDEXSTOREDB_SYMBOL_KIND_PROTOCOL;
+  case SymbolKind::Extension:
+    return INDEXSTOREDB_SYMBOL_KIND_EXTENSION;
+  case SymbolKind::Union:
+    return INDEXSTOREDB_SYMBOL_KIND_UNION;
+  case SymbolKind::TypeAlias:
+    return INDEXSTOREDB_SYMBOL_KIND_TYPEALIAS;
+  case SymbolKind::Function:
+    return INDEXSTOREDB_SYMBOL_KIND_FUNCTION;
+  case SymbolKind::Variable:
+    return INDEXSTOREDB_SYMBOL_KIND_VARIABLE;
+  case SymbolKind::Parameter:
+    return INDEXSTOREDB_SYMBOL_KIND_PARAMETER;
+  case SymbolKind::Field:
+    return INDEXSTOREDB_SYMBOL_KIND_FIELD;
+  case SymbolKind::EnumConstant:
+    return INDEXSTOREDB_SYMBOL_KIND_ENUMCONSTANT;
+  case SymbolKind::InstanceMethod:
+    return INDEXSTOREDB_SYMBOL_KIND_INSTANCEMETHOD;
+  case SymbolKind::ClassMethod:
+    return INDEXSTOREDB_SYMBOL_KIND_CLASSMETHOD;
+  case SymbolKind::StaticMethod:
+    return INDEXSTOREDB_SYMBOL_KIND_STATICMETHOD;
+  case SymbolKind::InstanceProperty:
+    return INDEXSTOREDB_SYMBOL_KIND_INSTANCEPROPERTY;
+  case SymbolKind::ClassProperty:
+    return INDEXSTOREDB_SYMBOL_KIND_CLASSPROPERTY;
+  case SymbolKind::StaticProperty:
+    return INDEXSTOREDB_SYMBOL_KIND_STATICPROPERTY;
+  case SymbolKind::Constructor:
+    return INDEXSTOREDB_SYMBOL_KIND_CONSTRUCTOR;
+  case SymbolKind::Destructor:
+    return INDEXSTOREDB_SYMBOL_KIND_DESTRUCTOR;
+  case SymbolKind::ConversionFunction:
+    return INDEXSTOREDB_SYMBOL_KIND_CONVERSIONFUNCTION;
+  case SymbolKind::CommentTag:
+    return INDEXSTOREDB_SYMBOL_KIND_COMMENTTAG;
+  default:
+    return INDEXSTOREDB_SYMBOL_KIND_UNKNOWN;
+  }
 }
