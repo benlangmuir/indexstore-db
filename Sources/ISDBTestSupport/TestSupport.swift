@@ -257,11 +257,7 @@ public final class TestSources {
 
 public final class TibsTestWorkspace {
 
-  public static let defaultToolchain = TibsToolchain(
-    swiftc: findTool(name: "swiftc")!,
-    clang: findTool(name: "clang")!,
-    tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
-    ninja: findTool(name: "ninja"))
+  public static let defaultToolchain = TibsToolchain.testDefault
 
   /// The directory containing the original, unmodified project.
   public let projectDir: URL

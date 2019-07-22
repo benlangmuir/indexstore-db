@@ -16,11 +16,7 @@ import XCTest
 
 final class TibsBuildTests: XCTestCase {
 
-  static let toolchain = TibsToolchain(
-    swiftc: findTool(name: "swiftc")!,
-    clang: findTool(name: "clang")!,
-    tibs: XCTestCase.productsDirectory.appendingPathComponent("tibs", isDirectory: false),
-    ninja: findTool(name: "ninja"))
+  static let toolchain = TibsToolchain.testDefault
 
   var fm: FileManager = FileManager.default
   var testDir: URL! = nil
@@ -123,17 +119,6 @@ final class TibsBuildTests: XCTestCase {
 }
 
 extension XCTestCase {
-  /// The path to the built products directory.
-  public static var productsDirectory: URL {
-    #if os(macOS)
-      for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
-          return bundle.bundleURL.deletingLastPathComponent()
-      }
-      fatalError("couldn't find the products directory")
-    #else
-      return Bundle.main.bundleURL
-    #endif
-  }
 
   /// The name of this test, mangled for use as a directory.
   public var testDirectoryName: String {

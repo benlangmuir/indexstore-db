@@ -33,7 +33,6 @@ public final class TibsToolchain {
     self.ninja = ninja
   }
 
-
 #if os(macOS)
   public static let dylibExt = "dylib"
 #else
@@ -102,6 +101,79 @@ public final class TibsToolchain {
             "differs; \(reason)\n", stderr)
       usleep(usec)
     }
+  }
+}
+
+extension TibsToolchain {
+
+  /// A toolchain suitable for using `tibs` for testing. Will `fatalError()` if we cannot determine
+  /// any components.
+  public static var testDefault: TibsToolchain {
+    var swiftc: URL? = nil
+    var clang: URL? = nil
+    var tibs: URL? = nil
+    var ninja: URL? = nil
+
+    let fm = FileManager.default
+
+    let envVar = "INDEXSTOREDB_TOOLCHAIN_PATH"
+    if let path = ProcessInfo.processInfo.environment[envVar] {
+      let bin = URL(fileURLWithPath: "\(path)/usr/bin", isDirectory: true)
+      swiftc = bin.appendingPathComponent("swiftc", isDirectory: false)
+      clang = bin.appendingPathComponent("clang", isDirectory: false)
+
+      if !fm.fileExists(atPath: swiftc!.path) {
+        fatalError("toolchain must contain 'swiftc' \(envVar)=\(path)")
+      }
+      if !fm.fileExists(atPath: clang!.path) {
+        clang = nil // try to find by PATH
+      }
+    }
+
+    if let ninjaPath = ProcessInfo.processInfo.environment["NINJA_BIN"] {
+      ninja = URL(fileURLWithPath: ninjaPath, isDirectory: false)
+    }
+
+    var buildURL: URL? = nil
+    #if os(macOS)
+      // If we are running under xctest, the build directory is the .xctest bundle.
+      for bundle in Bundle.allBundles {
+        if bundle.bundlePath.hasSuffix(".xctest") {
+          buildURL = bundle.bundleURL.deletingLastPathComponent()
+          break
+        }
+      }
+      // Otherwise, assume it is the main bundle.
+      if buildURL == nil {
+        buildURL = Bundle.main.bundleURL
+      }
+    #else
+      buildURL = Bundle.main.bundleURL
+    #endif
+
+    if let buildURL = buildURL {
+      tibs = buildURL.appendingPathComponent("tibs", isDirectory: false)
+      if !fm.fileExists(atPath: tibs!.path) {
+        tibs = nil // try to find by PATH
+      }
+    }
+
+    swiftc = swiftc ?? findTool(name: "swiftc")
+    clang = clang ?? findTool(name: "clang")
+    tibs = tibs ?? findTool(name: "tibs")
+    ninja = ninja ?? findTool(name: "ninja")
+
+    guard swiftc != nil, clang != nil, tibs != nil, ninja != nil else {
+      fatalError("""
+        missing TibsToolchain component; had
+          swiftc = \(swiftc?.path ?? "nil")
+          clang = \(clang?.path ?? "nil")
+          tibs = \(tibs?.path ?? "nil")
+          ninja = \(ninja?.path ?? "nil")
+        """)
+    }
+
+    return TibsToolchain(swiftc: swiftc!, clang: clang!, tibs: tibs!, ninja: ninja)
   }
 }
 
