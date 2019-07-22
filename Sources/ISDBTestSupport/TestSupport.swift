@@ -497,7 +497,7 @@ extension XCTestCase {
 extension Symbol {
 
   /// Returns a copy of the symbol with the new name, usr, and/or kind.
-  public func with(name: String? = nil, usr: String? = nil, kind: Kind? = nil) -> Symbol {
+  public func with(name: String? = nil, usr: String? = nil, kind: IndexSymbolKind? = nil) -> Symbol {
     return Symbol(usr: usr ?? self.usr, name: name ?? self.name, kind: kind ?? self.kind)
   }
 

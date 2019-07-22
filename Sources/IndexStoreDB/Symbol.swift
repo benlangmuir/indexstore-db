@@ -12,47 +12,44 @@
 
 import CIndexStoreDB
 
-// FIXME: remove
-public typealias IndexSymbolKind = Symbol.Kind
+public enum IndexSymbolKind: Hashable {
+  case unknown
+  case module
+  case namespace
+  case namespaceAlias
+  case macro
+  case `enum`
+  case `struct`
+  case `class`
+  case `protocol`
+  case `extension`
+  case union
+  case `typealias`
+  case function
+  case variable
+  case field
+  case enumConstant
+  case instanceMethod
+  case classMethod
+  case staticMethod
+  case instanceProperty
+  case classProperty
+  case staticProperty
+  case constructor
+  case destructor
+  case conversionFunction
+  case parameter
+  case using
+  case commentTag
+}
 
 public struct Symbol: Equatable {
 
-  public enum Kind: Hashable {
-    case unknown
-    case module
-    case namespace
-    case namespaceAlias
-    case macro
-    case `enum`
-    case `struct`
-    case `class`
-    case `protocol`
-    case `extension`
-    case union
-    case `typealias`
-    case function
-    case variable
-    case field
-    case enumConstant
-    case instanceMethod
-    case classMethod
-    case staticMethod
-    case instanceProperty
-    case classProperty
-    case staticProperty
-    case constructor
-    case destructor
-    case conversionFunction
-    case parameter
-    case using
-    case commentTag
-  }
-
   public var usr: String
   public var name: String
-  public var kind: Kind
+  public var kind: IndexSymbolKind
 
-  public init(usr: String, name: String, kind: Kind) {
+  public init(usr: String, name: String, kind: IndexSymbolKind) {
     self.usr = usr
     self.name = name
     self.kind = kind
@@ -80,14 +77,14 @@ extension Symbol {
     self.init(
       usr: String(cString: indexstoredb_symbol_usr(value)),
       name: String(cString: indexstoredb_symbol_name(value)),
-      kind: Kind(indexstoredb_symbol_kind(value)))
+      kind: IndexSymbolKind(indexstoredb_symbol_kind(value)))
 
     // FIXME: remove unnecessary refcounting of symbols.
     indexstoredb_release(value)
   }
 }
 
-extension Symbol.Kind {
+extension IndexSymbolKind {
   init(_ cSymbolKind: indexstoredb_symbol_kind_t) {
     switch cSymbolKind {
     case INDEXSTOREDB_SYMBOL_KIND_UNKNOWN:

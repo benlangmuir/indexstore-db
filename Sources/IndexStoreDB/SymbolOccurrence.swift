@@ -12,27 +12,13 @@
 
 import CIndexStoreDB
 
-// FIXME: remove
-public typealias SymbolRelation = SymbolOccurrence.Relation
-
 public struct SymbolOccurrence: Equatable {
-
-  public struct Relation: Equatable {
-    public var symbol: Symbol
-    public var roles: SymbolRole
-
-    public init(symbol: Symbol, roles: SymbolRole) {
-      self.symbol = symbol
-      self.roles = roles
-    }
-  }
-
   public var symbol: Symbol
   public var location: SymbolLocation
   public var roles: SymbolRole
-  public var relations: [Relation]
+  public var relations: [SymbolRelation]
 
-  public init(symbol: Symbol, location: SymbolLocation, roles: SymbolRole, relations: [Relation] = []) {
+  public init(symbol: Symbol, location: SymbolLocation, roles: SymbolRole, relations: [SymbolRelation] = []) {
     self.symbol = symbol
     self.location = location
     self.roles = roles
@@ -47,8 +33,8 @@ extension SymbolOccurrence: Comparable {
   }
 }
 
-extension SymbolOccurrence.Relation: Comparable {
-  public static func <(a: SymbolOccurrence.Relation, b: SymbolOccurrence.Relation) -> Bool {
+extension SymbolRelation: Comparable {
+  public static func <(a: SymbolRelation, b: SymbolRelation) -> Bool {
     (a.roles, a.symbol) < (b.roles, b.symbol)
   }
 }
@@ -59,15 +45,25 @@ extension SymbolOccurrence: CustomStringConvertible {
   }
 }
 
+public struct SymbolRelation: Equatable {
+  public var symbol: Symbol
+  public var roles: SymbolRole
+
+  public init(symbol: Symbol, roles: SymbolRole) {
+    self.symbol = symbol
+    self.roles = roles
+  }
+}
+
 // MARK: CIndexStoreDB conversions
 
 extension SymbolOccurrence {
 
   /// Note: `value` is expected to be passed +1.
   init(_ value: indexstoredb_symbol_occurrence_t) {
-    var relations: [Relation] = []
+    var relations: [SymbolRelation] = []
     indexstoredb_symbol_occurrence_relations(value) { relation in
-      relations.append(Relation(relation))
+      relations.append(SymbolRelation(relation))
       return true
     }
 
@@ -82,7 +78,7 @@ extension SymbolOccurrence {
   }
 }
 
-extension SymbolOccurrence.Relation {
+extension SymbolRelation {
   public init(_ value: indexstoredb_symbol_relation_t) {
     self.init(
       symbol: Symbol(indexstoredb_symbol_relation_get_symbol(value)),
