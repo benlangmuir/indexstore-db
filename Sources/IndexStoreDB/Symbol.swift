@@ -68,6 +68,23 @@ extension Symbol: CustomStringConvertible {
   }
 }
 
+extension Symbol {
+
+  /// Returns a copy of the symbol with the new name, usr, and/or kind.
+  public func with(
+    name: String? = nil,
+    usr: String? = nil,
+    kind: IndexSymbolKind? = nil) -> Symbol
+  {
+    return Symbol(usr: usr ?? self.usr, name: name ?? self.name, kind: kind ?? self.kind)
+  }
+
+  /// Returns a SymbolOccurrence with the given location and roles.
+  public func at(_ location: SymbolLocation, roles: SymbolRole) -> SymbolOccurrence {
+    return SymbolOccurrence(symbol: self, location: location, roles: roles)
+  }
+}
+
 // MARK: CIndexStoreDB conversions
 
 extension Symbol {

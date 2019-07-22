@@ -29,7 +29,7 @@ final class LocationScannerTests: XCTestCase {
       self.line = line
       self.column = column
     }
-    init(_ name: String, _ loc: TestLoc) {
+    init(_ name: String, _ loc: TestLocation) {
       self.url = loc.url
       self.name = name
       self.line = loc.line
@@ -42,7 +42,7 @@ final class LocationScannerTests: XCTestCase {
   }
 
   func scanString(_ str: String) throws -> [Loc] {
-    var scanner = LocationScanner()
+    var scanner = TestLocationScanner()
     try scanner.scan(str, url: LocationScannerTests.magicURL)
     return scanner.result.map { key, value in Loc(key, value) }.sorted()
   }
