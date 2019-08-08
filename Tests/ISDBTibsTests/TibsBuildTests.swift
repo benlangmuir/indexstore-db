@@ -70,13 +70,13 @@ final class TibsBuildTests: XCTestCase {
   func testBuildSwiftModules() throws {
     let builder = try copyAndLoad(project: "SwiftModules")
     try builder.writeBuildFiles()
-    XCTAssertEqual(try builder._buildTest(), ["Swift Module A", "Swift Module B", "Swift Module C"])
-    XCTAssertEqual(try builder._buildTest(), [])
+    XCTAssertEqual(Set(try builder._buildTest()), ["Swift Module A", "Swift Module B", "Swift Module C"])
+    XCTAssertEqual(Set(try builder._buildTest()), [])
 
     let bswift = sourceRoot.appendingPathComponent("b.swift", isDirectory: false)
     builder.toolchain.sleepForTimestamp()
     try "public func bbb() -> Int { 0 }".write(to: bswift, atomically: false, encoding: .utf8)
-    XCTAssertEqual(try builder._buildTest(), ["Swift Module B", "Swift Module C"])
+    XCTAssertEqual(Set(try builder._buildTest()), ["Swift Module B", "Swift Module C"])
 
     let cswift = sourceRoot.appendingPathComponent("c.swift", isDirectory: false)
     builder.toolchain.sleepForTimestamp()
@@ -94,9 +94,9 @@ final class TibsBuildTests: XCTestCase {
     let dcpp = sourceRoot.appendingPathComponent("d.cpp", isDirectory: false)
     let emm = sourceRoot.appendingPathComponent("e.mm", isDirectory: false)
 
-    XCTAssertEqual(try builder._buildTest(),
+    XCTAssertEqual(Set(try builder._buildTest()),
       ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
-    XCTAssertEqual(try builder._buildTest(), [])
+    XCTAssertEqual(Set(try builder._buildTest()), [])
 
     let ch = sourceRoot.appendingPathComponent("c.h", isDirectory: false)
 
@@ -106,7 +106,7 @@ final class TibsBuildTests: XCTestCase {
     builder.toolchain.sleepForTimestamp()
     try content.write(to: ch)
     // FIXME: there is a false dependency because of the generated header main-Swift.h
-    XCTAssertEqual(try builder._buildTest(),
+    XCTAssertEqual(Set(try builder._buildTest()),
       ["Swift Module main", bc.path, cm.path, dcpp.path, emm.path])
 
     builder.toolchain.sleepForTimestamp()
@@ -114,7 +114,7 @@ final class TibsBuildTests: XCTestCase {
     try """
       class D {};
       """.write(to: dh, atomically: false, encoding: .utf8)
-    XCTAssertEqual(try builder._buildTest(), [dcpp.path, emm.path])
+    XCTAssertEqual(Set(try builder._buildTest()), [dcpp.path, emm.path])
   }
 }
 
